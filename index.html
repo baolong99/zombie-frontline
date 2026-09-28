@@ -1800,14 +1800,19 @@
     if (p.muzzle) p.muzzle = Math.max(0, p.muzzle - dt);
 
     // ---- auto fire
+    // Không có gì trong tầm thì giữ đạn. Trước đây súng nhả liên tục kể cả khi bắn vào khoảng
+    // không: phí cả băng đạn lẫn chu kỳ thay đạn, và làm chỉ số Chính xác mất hết ý nghĩa.
+    // Cộng thêm bán kính mục tiêu để con trùm to đứng sát mép tầm vẫn bị bắn.
+    var inRange = !!tgt && Math.hypot(tgt.x - p.x, tgt.y - p.y) <= ws.range + tgt.r;
     var g = G.guns[p.wi];
     if (g.reloadT > 0){
       g.reloadT -= dt; p.spin = 0;
       if (g.reloadT <= 0){ g.ammo = ws.mag; blip(520, 0.07, "triangle", 0.04); }
     } else {
       p.spin = WEAPONS[p.wi].spin > 0 ? Math.min(1, p.spin + dt / WEAPONS[p.wi].spin) : 1;
-      g.cool -= dt;
-      if (g.cool <= 0){ fire(); g.cool = ws.rate / (0.45 + 0.55 * p.spin); }
+      // đồng hồ hồi vẫn chạy khi đang giữ đạn, nên vừa có mục tiêu là bắn ngay, không trễ nhịp
+      if (g.cool > 0) g.cool -= dt;
+      if (g.cool <= 0 && inRange){ fire(); g.cool = ws.rate / (0.45 + 0.55 * p.spin); }
     }
 
     // ---- schedule: trickle spawns + elites on the clock
@@ -3036,6 +3041,8 @@
       axes:"toạ độ at[] là tương đối so với nhân vật: +x sang phải, +y xuống dưới; nhân vật luôn ở giữa màn hình",
       mode:G.state, started:started, t:Math.round(G.t), lvl:G.lvl, xp:[Math.round(G.xp), G.xpNext],
       kills:G.kills, gold:G.gold, lang:LANG,
+      shots:G.shots, hits:G.hitshots,
+      acc:G.shots ? Math.round(G.hitshots / G.shots * 100) : 0,
       player:{ world:[Math.round(p.x), Math.round(p.y)], hp:Math.round(p.hp), maxhp:Math.round(p.maxhp),
                aimDeg:Math.round(p.a * 180 / Math.PI), r:Math.round(p.r), shield:p.shieldUp },
       weapon:{ id:WEAPONS[p.wi].id, ammo:gun.ammo, mag:ws.mag, reloading:gun.reloadT > 0,
