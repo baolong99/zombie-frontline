@@ -41,9 +41,28 @@ Cố định **10 phút**, bản đồ vô tận không có biên.
 | Nhặt hộp của elite phút 10 | **Trùm chính Bạo Chúa** xuất hiện, vòng vây lần hai |
 | Hạ Bạo Chúa | Thắng màn |
 
-Giết quái rơi ngọc kinh nghiệm → lên cấp → chọn 1 trong 3 nâng cấp lẻ. Hạ trùm phụ được
-chọn **một nâng cấp độc nhất** định hình cả bản build (Đạn Nặng / Bão Đạn / Xuyên Phá /
-Khổng Lồ). Mỗi hiệu ứng tối đa 5 cấp, đạt trần là biến khỏi danh sách chọn.
+## Cây nâng cấp
+
+Năm nhánh, mỗi nhánh ba node **mở khoá một lần** — không có cấp bậc. Node 1–2 là chỉ số,
+node 3 luôn là một năng lực có điều kiện kích hoạt. Mở trọn ba node thì hộp elite tiếp theo
+trao **nâng cấp tinh anh** của nhánh đó.
+
+| Nhánh | Node 1 | Node 2 | Node 3 (kích hoạt) | ★ Tinh anh |
+|---|---|---|---|---|
+| **Hoả Lực** | Sát thương +60% | Cỡ đạn +7px, +40% dmg | **Đạn Nện** — mỗi 8 phát kèm viên nặng ×3, nổ r70 | **Xuyên Giáp** — mỗi 4 phát, và bỏ qua mọi giáp |
+| **Đa Hướng** | Đa nòng +2 đường | Nòng phụ sau +2 viên | **Nổ Vòng** — cạn băng là bắn 8 hướng | **Bão Tố** — +2 đường nữa, xác nổ 6 tia bằng 30% dmg |
+| **Xuyên & Nảy** | Đạn xuyên +3 | Đạn nảy +3 | **Xuyên Thấu** — mỗi lần xuyên +15% dmg, cộng dồn | **Đạn Truy Hồn** — nảy tới 260px, nhắm con yếu nhất, +25%/lần |
+| **Nhịp Bắn** | Tốc độ bắn +70% | Băng đạn ×2,5, thay nhanh ×2 | **Nạp Nóng** — thay xong thì 1,5s bắn gấp đôi | **Không Ngừng** — mỗi mạng rút 0,04s hồi; Nạp Nóng 3s |
+| **Sinh Tồn** | Thể Lực +90 máu, +25% chạy | Hút máu 1/8 dmg | **Khiên bảo hộ** — chặn 1 đòn, hồi 50s | **Bất Khuất** — đòn chí tử hồi 40% máu + hất văng, 90s |
+
+Một ván cho khoảng **10–11 lần lên cấp** cộng 5 hộp elite, tức mở được chừng **3 nhánh
+trọn vẹn**. Đó là ngân sách quyết định đường cong kinh nghiệm, không phải ngược lại.
+
+Hạ trùm phụ còn được chọn **một nâng cấp độc nhất** định hình cả bản build (Đạn Nặng /
+Bão Đạn / Xuyên Phá / Khổng Lồ), độc lập với cây.
+
+Sức mạnh dài hạn **không** nằm trong cây — nó để dành cho cửa hàng: mua súng, phụ kiện,
+nâng sao (★ tới ★★★★★). Cây lo bản sắc từng ván, cửa hàng lo tiến bộ qua nhiều ván.
 
 ## Bảng Tune
 
@@ -108,6 +127,17 @@ npm run all
 | `arena.mjs` | Vòng vây kẹp đúng bán kính, mũi tên chỉ hộp |
 | `visual.mjs` | Chụp toàn trang: HUD, bảng Tune, menu nâng cấp, đổi ngôn ngữ giữa menu |
 | `themes.mjs` | Chụp ba khu vực ở cùng thời điểm để so sánh |
+| `survive.mjs` | **Tắt bất tử**, 3 lượt, đo bot sống được bao lâu. Nhận đường dẫn file khác làm tham số để so hai phiên bản |
+
+`survive.mjs` là bài duy nhất trả lời được câu "cân bằng có ổn không". Con bot chọn ngẫu
+nhiên và chạy loạn nên nó dở hơn người thật nhiều — đọc nó như **mức sàn so sánh giữa hai
+phiên bản**, đừng đọc như độ khó thật. Cách so:
+
+```bash
+git show HEAD:index.html > /tmp/prev.html
+node survive.mjs /tmp/prev.html      # bản cũ
+node survive.mjs                     # bản hiện tại
+```
 
 Ảnh chụp rơi vào `tests/output/` (đã ignore).
 
@@ -119,7 +149,9 @@ script của game qua `vm`. Nhanh và hợp cho CI. Nhưng nó *không* thấy �
 
 - Chưa có art thật — toàn bộ vẫn là hình vẽ bằng canvas primitive.
 - Ba khu vực mới khác nhau ở bảng màu và vật trang trí, chưa có ảnh lát nền.
-- Chưa có sảnh, chưa có hệ thể lực, chưa có mua bán súng bằng vàng.
+- Chưa có sảnh, chưa có hệ thể lực, chưa có cửa hàng súng / phụ kiện / nâng sao. Bảng cân
+  bằng hiện tại (`hpScale` ×1→×1,9 · trùm chính 3.800 · trùm phụ 1.600) được đặt cho người
+  chơi **tay không**; khi có hệ sao thì phải nâng lại toàn bộ.
 - Giãn cách quái tự tắt khi trên 110 con (xem chú thích trong `update`), nên ở mật độ cao
   đám đông dính thành khối. Cần thay bằng lưới băm không gian.
 - Số DPS trên HUD chưa cộng nòng phụ sau.

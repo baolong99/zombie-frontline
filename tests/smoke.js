@@ -123,7 +123,7 @@ const probed = code.replace(/\}\)\(\);\s*$/,
   " t:Math.round(G.t), kills:G.kills, uni:G.unique, state:G.state," +
   " pending:G.pending.length, pick:G.curPick && G.curPick.type," +
   " opts:G.curPick && G.curPick.opts, bossSpawned:G.bossSpawned," +
-  " bossAfter:G.bossAfterPick, arena:!!G.arena, adv:G.adv }; };\n})();");
+  " bossAfter:G.bossAfterPick, arena:!!G.arena, adv:G.adv, up:G.up }; };\n})();");
 if (probed === code) { console.log("probe injection failed"); process.exit(1); }
 
 vm.createContext(sandbox);
@@ -191,6 +191,8 @@ console.log("frames=" + FRAMES + "  iter=" + i + "  picks=" + picks + "  errors=
             "  t=" + sandbox.__probe().t + "s");
 console.log("menus seen: " + JSON.stringify(seen));
 console.log("boss name=" + JSON.stringify($("bossname").textContent) + " hidden=" + $("bosswrap").hidden);
+var end = sandbox.__probe();
+console.log("node đã mở (" + Object.keys(end.up).length + "): " + Object.keys(end.up).join(", "));
 console.log("hud time=" + $("c-time").textContent + "  kills=" + $("c-kills").textContent +
             "  lvl=" + $("c-lvl").textContent + "  gold=" + $("c-gold").textContent);
 console.log("dead overlay=" + $("ov-dead").classList.contains("on") +
