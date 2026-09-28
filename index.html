@@ -354,7 +354,6 @@
           <div><span data-i18n="stat.kills"></span><b id="v-kills">0</b></div>
           <div><span data-i18n="stat.level"></span><b id="v-lvl">1</b></div>
           <div><span data-i18n="stat.gold"></span><b id="v-gold">0</b></div>
-          <div><span data-i18n="stat.acc"></span><b id="v-acc">0%</b></div>
         </div>
         <button class="btn" id="btn-again" type="button" data-i18n="win.btn">Chơi lại</button>
       </div>
@@ -541,7 +540,7 @@
       "pause.body":"Chỉnh thông số trong bảng Tune rồi quay lại — thay đổi có hiệu lực ngay lập tức.",
       "pause.btn":"Tiếp tục",
       "stat.survived":"Trụ được", "stat.kills":"Diệt", "stat.level":"Cấp",
-      "stat.gold":"Vàng", "stat.time":"Thời gian", "stat.acc":"Chính xác",
+      "stat.gold":"Vàng", "stat.time":"Thời gian",
 
       "panel.title":"Bảng Tune",
       "panel.note":"Một màn dài 10 phút nên hãy dùng nút tua nhanh và các nút triệu hồi bên dưới thay vì ngồi chờ.",
@@ -666,7 +665,7 @@
       "pause.body":"Change anything in the Tune panel and come back — every change applies immediately.",
       "pause.btn":"Resume",
       "stat.survived":"Survived", "stat.kills":"Kills", "stat.level":"Level",
-      "stat.gold":"Gold", "stat.time":"Time", "stat.acc":"Accuracy",
+      "stat.gold":"Gold", "stat.time":"Time",
 
       "panel.title":"Tune panel",
       "panel.note":"A run lasts 10 minutes, so use the fast-forward slider and the summon buttons instead of waiting it out.",
@@ -901,7 +900,7 @@
 
   function newGame(){
     G = {
-      t:0, state:"play", kills:0, shots:0, hitshots:0, gold:0,
+      t:0, state:"play", kills:0, gold:0,
       shake:0, flash:0, leechAcc:0,
       lvl:1, xp:0, xpNext:xpForLevel(1),
       adv:0, advByGroup:{}, eliteIdx:0, miniSpawned:false, mini:null, arena:null,
@@ -1288,12 +1287,11 @@
   }
   function shoot(x, y, a, ws, mul){
     if (G.bullets.length > 460) return;
-    G.shots++;   // đếm theo từng viên, khớp với cách đếm trúng, nếu không độ chính xác sẽ vượt 100%
     G.bullets.push({ x:x, y:y, vx:Math.cos(a)*ws.base.bspeed, vy:Math.sin(a)*ws.base.bspeed,
       dmg:ws.dmg * (mul || 1), left:ws.range, range:ws.range, pierce:ws.pierce, pierceLeft:ws.pierce,
       bounce:ws.bounce, rebound:ws.rebound || 0,
       rad:ws.rad, kb:ws.base.kb, c:ws.base.color, trail:ws.base.trail,
-      hits:[], counted:false });
+      hits:[] });
   }
   function bounceTo(b, from){
     var zs = G.zombies, best = null, bd = 170;
@@ -1406,7 +1404,7 @@
         var ang = off + (a6 / 6) * Math.PI * 2;
         G.bullets.push({ x:z.x, y:z.y, vx:Math.cos(ang) * 560, vy:Math.sin(ang) * 560,
           dmg:hdmg, left:hrange, pierce:1, pierceLeft:1, bounce:0, rad:4.4, kb:16,
-          c:"#c79bff", trail:8, hits:[], counted:true, hex:true });
+          c:"#c79bff", trail:8, hits:[], hex:true });
       }
       ring(z.x, z.y, 28, "rgba(176,124,255,.85)");
       blip(560, 0.05, "square", 0.024);
@@ -1998,7 +1996,6 @@
         if (Math.abs(zz.x - b.x) > zz.r + b.rad + 2 || Math.abs(zz.y - b.y) > zz.r + b.rad + 2) continue;
         if (Math.hypot(zz.x - b.x, zz.y - b.y) > zz.r + b.rad) continue;
 
-        if (!b.counted){ G.hitshots++; b.counted = true; }
         var kl = Math.hypot(b.vx, b.vy) || 1;
         var travel = Math.atan2(b.vy, b.vx);
         zz.x += b.vx / kl * b.kb * 0.08; zz.y += b.vy / kl * b.kb * 0.08;
@@ -2155,7 +2152,6 @@
     $("v-kills").textContent = G.kills;
     $("v-lvl").textContent = G.lvl;
     $("v-gold").textContent = G.gold;
-    $("v-acc").textContent = G.shots ? Math.round(G.hitshots / G.shots * 100) + "%" : "0%";
     $("ov-win").classList.add("on");
     blip(660, 0.3, "triangle", 0.07);
     blip(880, 0.4, "triangle", 0.05);
@@ -3041,8 +3037,6 @@
       axes:"toạ độ at[] là tương đối so với nhân vật: +x sang phải, +y xuống dưới; nhân vật luôn ở giữa màn hình",
       mode:G.state, started:started, t:Math.round(G.t), lvl:G.lvl, xp:[Math.round(G.xp), G.xpNext],
       kills:G.kills, gold:G.gold, lang:LANG,
-      shots:G.shots, hits:G.hitshots,
-      acc:G.shots ? Math.round(G.hitshots / G.shots * 100) : 0,
       player:{ world:[Math.round(p.x), Math.round(p.y)], hp:Math.round(p.hp), maxhp:Math.round(p.maxhp),
                aimDeg:Math.round(p.a * 180 / Math.PI), r:Math.round(p.r), shield:p.shieldUp },
       weapon:{ id:WEAPONS[p.wi].id, ammo:gun.ammo, mag:ws.mag, reloading:gun.reloadT > 0,
