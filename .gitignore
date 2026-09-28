@@ -1,0 +1,12 @@
+node_modules/
+package-lock.json
+
+# ảnh chụp do kịch bản kiểm sinh ra
+tests/output/
+
+# rác hệ điều hành / editor
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/

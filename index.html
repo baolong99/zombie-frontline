@@ -1,0 +1,3073 @@
+<title>Zombie Frontline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root{
+    color-scheme: dark;
+    --bg:#0a0f0d; --bg2:#0e1512; --panel:#121b17; --panel2:#17221d;
+    --line:#233129; --line2:#2f4238;
+    --ink:#e4ede7; --ink2:#b6c7bd; --muted:#7f958a;
+    --toxic:#8ee64a; --toxic-dim:#5b9c2e;
+    --danger:#ff5347; --amber:#ffb340; --cyan:#4ec9e0; --violet:#b07cff; --ember:#ff7a4e;
+    --shadow:0 10px 30px rgba(0,0,0,.55);
+    --f-display:"Chakra Petch","Segoe UI",system-ui,sans-serif;
+    --f-body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+    --f-mono:"IBM Plex Mono",ui-monospace,"Cascadia Mono",monospace;
+  }
+  *{box-sizing:border-box}
+  /* .bosswrap đặt display:flex nên cần luật này để thuộc tính hidden thắng được */
+  [hidden]{display:none !important}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:var(--f-body); overflow:hidden;
+    -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent;
+  }
+  .app{height:100%; display:flex; align-items:stretch}
+  .stage{position:relative; flex:1; min-width:0; background:var(--bg2); overflow:hidden}
+  #game{position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none}
+
+  /* ---------- HUD ---------- */
+  .hud{position:absolute; inset:0; pointer-events:none; padding:14px; display:flex; flex-direction:column; gap:10px}
+  .hud-top{display:flex; gap:12px; align-items:flex-start; justify-content:space-between}
+  .vitals{display:flex; flex-direction:column; gap:7px; width:222px; flex:none}
+  .bar{position:relative; border:1px solid var(--line2); background:#0b120f; border-radius:3px; overflow:hidden}
+  .bar > i{position:absolute; inset:0; transform-origin:left; display:block}
+  .hpwrap{height:16px}
+  .hpfill{background:linear-gradient(90deg,#3f8f2a,var(--toxic))}
+  .hpfill.low{background:linear-gradient(90deg,#8e2118,var(--danger))}
+  .bartext{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font:600 10px/1 var(--f-mono); letter-spacing:.1em; color:#eaf6ea; text-shadow:0 1px 2px rgba(0,0,0,.85)}
+  .xpwrap{height:11px}
+  .xpfill{background:linear-gradient(90deg,#2b7f91,var(--cyan))}
+  .shieldbar{position:relative; height:12px; background:#0b120f; border:1px solid var(--line2);
+    border-radius:2px; overflow:hidden}
+  .shieldfill{position:absolute; inset:0; transform-origin:left; background:linear-gradient(90deg,#4b3486,#8b5fd8)}
+  .shieldbar.ready .shieldfill{background:linear-gradient(90deg,#8b5fd8,var(--violet))}
+  .shieldtext{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font:600 9px/1 var(--f-mono); letter-spacing:.16em; text-transform:uppercase; color:#efe6ff;
+    text-shadow:0 1px 2px rgba(0,0,0,.85)}
+  .chips{display:flex; gap:5px; flex-wrap:wrap}
+  .chip{font:600 10px/1 var(--f-mono); letter-spacing:.08em; text-transform:uppercase;
+    padding:5px 7px; border:1px solid var(--line2); border-radius:3px; background:rgba(10,18,14,.75); color:var(--ink2)}
+  .chip b{color:var(--toxic); font-weight:600}
+  .chip.rear{border-color:rgba(255,179,64,.55)} .chip.rear b{color:var(--amber)}
+  .upstack{display:flex; gap:4px; flex-wrap:wrap; width:222px}
+  .uptag{font:600 9px/1 var(--f-mono); letter-spacing:.06em; text-transform:uppercase; padding:4px 5px;
+    border:1px solid currentColor; border-radius:3px; background:rgba(10,18,14,.6)}
+
+  .topcenter{position:absolute; left:50%; top:14px; transform:translateX(-50%);
+    display:flex; flex-direction:column; align-items:center; gap:6px; pointer-events:none; width:min(420px,60%)}
+  .timer{font:700 30px/1 var(--f-display); letter-spacing:.05em; font-variant-numeric:tabular-nums;
+    text-shadow:0 2px 8px rgba(0,0,0,.8)}
+  .timer.over{color:var(--danger)}
+  .timersub{font:600 9px/1 var(--f-mono); letter-spacing:.2em; text-transform:uppercase; color:var(--muted)}
+  .timersub.hot{color:var(--amber)}
+  .bosswrap{width:100%; display:flex; flex-direction:column; gap:4px; align-items:center; margin-top:4px}
+  .bossname{font:700 11px/1 var(--f-display); letter-spacing:.18em; text-transform:uppercase; color:var(--danger)}
+  .bossbar{width:100%; height:12px}
+  .bossfill{background:linear-gradient(90deg,#7d1b13,var(--danger))}
+
+  .wpnbox{background:rgba(10,18,14,.78); border:1px solid var(--line2); border-radius:4px; padding:9px 11px; width:196px; flex:none}
+  .wpnname{font:700 16px/1.1 var(--f-display); letter-spacing:.04em; text-transform:uppercase}
+  .wpnstats{margin-top:6px; display:grid; grid-template-columns:auto 1fr; gap:2px 10px;
+    font:500 10px/1.35 var(--f-mono); color:var(--muted)}
+  .wpnstats span:nth-child(even){color:var(--ink2); text-align:right; font-variant-numeric:tabular-nums}
+  .ammo{margin-top:7px; display:flex; align-items:center; gap:7px}
+  .ammonum{font:600 12px/1 var(--f-mono); font-variant-numeric:tabular-nums; min-width:56px}
+  .ammobar{flex:1; height:5px; background:#0b120f; border:1px solid var(--line); border-radius:2px; overflow:hidden}
+  .ammofill{height:100%; transform-origin:left; background:var(--amber)}
+  .reloading .ammofill{background:var(--cyan)}
+
+  .hud-bottom{margin-top:auto}
+  .hintbar{display:inline-block; font:500 11px/1.6 var(--f-mono); color:var(--muted); background:rgba(10,18,14,.7);
+    border:1px solid var(--line); border-radius:3px; padding:7px 10px}
+  .hintbar kbd{font:600 10px/1 var(--f-mono); background:var(--panel2); border:1px solid var(--line2);
+    border-bottom-width:2px; border-radius:3px; padding:3px 5px; color:var(--ink); margin:0 1px}
+
+  /* ---------- touch ---------- */
+  .touch{position:absolute; inset:0; pointer-events:none; display:none}
+  .touch.on{display:block}
+  .stickzone{position:absolute; left:0; bottom:0; width:54%; height:66%; pointer-events:auto}
+  .stick{position:absolute; width:118px; height:118px; margin:-59px 0 0 -59px; border-radius:50%;
+    border:2px solid rgba(142,230,74,.3); background:rgba(10,20,14,.32); opacity:0}
+  .stick.on{opacity:1}
+  .knob{position:absolute; left:50%; top:50%; width:52px; height:52px; margin:-26px 0 0 -26px; border-radius:50%;
+    background:rgba(142,230,74,.3); border:2px solid var(--toxic)}
+  .tbtns{position:absolute; right:14px; bottom:calc(16px + env(safe-area-inset-bottom,0px));
+    display:flex; flex-direction:column; align-items:flex-end; gap:10px; pointer-events:auto}
+  .tbtn{width:74px; height:74px; border-radius:50%; border:2px solid var(--line2); background:rgba(14,22,18,.8);
+    color:var(--ink); font:700 11px/1.15 var(--f-display); letter-spacing:.06em; text-transform:uppercase;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; cursor:pointer}
+  .tbtn small{font:500 9px/1 var(--f-mono); color:var(--muted)}
+  .tbtn:active{background:rgba(142,230,74,.2); border-color:var(--toxic)}
+
+  /* ---------- overlays ---------- */
+  .overlay{position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+    background:rgba(5,9,7,.9); padding:20px; z-index:5; overflow-y:auto}
+  .overlay.on{display:flex}
+  .card{max-width:620px; width:100%; text-align:center; padding-block:10px}
+  .kicker{font:600 10px/1 var(--f-mono); letter-spacing:.3em; text-transform:uppercase; color:var(--toxic)}
+  .card h1{font:700 clamp(28px,6vw,46px)/1.05 var(--f-display); letter-spacing:.02em; text-transform:uppercase;
+    margin:12px 0 8px; text-wrap:balance}
+  .card h2{font:700 clamp(20px,5vw,29px)/1.1 var(--f-display); text-transform:uppercase; margin:10px 0 8px; text-wrap:balance}
+  .card p{font-size:13.5px; line-height:1.65; color:var(--ink2); margin:0 auto; max-width:44em}
+  .card p b{color:var(--ink)}
+  .btn{margin-top:20px; font:700 13px/1 var(--f-display); letter-spacing:.14em; text-transform:uppercase;
+    padding:14px 30px; border-radius:3px; border:1px solid var(--toxic); background:rgba(142,230,74,.12);
+    color:var(--toxic); cursor:pointer}
+  .btn:hover{background:rgba(142,230,74,.22)}
+  .btn:focus-visible,.tbtn:focus-visible,.picks button:focus-visible,.pbtn:focus-visible,.paneltoggle:focus-visible{
+    outline:2px solid var(--cyan); outline-offset:2px}
+  .keyguide{margin:22px auto 0; display:grid; grid-template-columns:repeat(auto-fit,minmax(168px,1fr));
+    gap:8px; max-width:560px; text-align:left}
+  .keyguide div{border:1px solid var(--line); border-radius:3px; padding:9px 11px; background:var(--panel);
+    font:500 11px/1.45 var(--f-mono); color:var(--muted)}
+  .keyguide b{display:block; color:var(--ink); font:600 11px/1.4 var(--f-mono); margin-bottom:3px}
+
+  .picks{margin-top:20px; display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px}
+  .picks button{border:1px solid var(--line2); background:var(--panel); border-radius:4px; padding:15px 13px;
+    text-align:left; cursor:pointer; color:var(--ink); border-top:3px solid var(--line2)}
+  .picks button:hover{background:var(--panel2)}
+  .picks .pname{display:block; font:700 13px/1.2 var(--f-display); text-transform:uppercase; letter-spacing:.03em}
+  .picks .pdesc{display:block; margin-top:6px; font-size:11.5px; line-height:1.5; color:var(--ink2)}
+  .picks .plvl{display:block; margin-top:8px; font:600 9px/1 var(--f-mono); letter-spacing:.14em;
+    text-transform:uppercase; color:var(--muted)}
+  .fxlist{margin-top:9px; display:flex; flex-direction:column; gap:4px}
+  .fxlist span{font:500 10px/1.3 var(--f-mono); color:var(--ink2); display:flex; justify-content:space-between; gap:8px}
+  .fxlist span i{font-style:normal; color:var(--muted); font-variant-numeric:tabular-nums}
+
+  .runstats{margin:22px auto 0; display:flex; gap:22px; justify-content:center; flex-wrap:wrap}
+  .runstats div{font:500 10px/1 var(--f-mono); letter-spacing:.14em; text-transform:uppercase; color:var(--muted)}
+  .runstats b{display:block; margin-top:8px; font:600 25px/1 var(--f-mono); color:var(--ink); font-variant-numeric:tabular-nums}
+
+  /* ---------- panel ---------- */
+  .panel{width:334px; flex:none; background:var(--panel); border-left:1px solid var(--line); overflow-y:auto; padding-bottom:22px}
+  .phead{position:sticky; top:0; background:var(--panel); border-bottom:1px solid var(--line); padding:14px 16px 12px; z-index:2}
+  .phead h2{margin:0; font:700 13px/1.2 var(--f-display); letter-spacing:.14em; text-transform:uppercase}
+  .phead p{margin:5px 0 0; font-size:11px; line-height:1.5; color:var(--muted)}
+  .grp{padding:14px 16px 4px; border-bottom:1px solid var(--line)}
+  .grp h3{margin:0 0 12px; font:600 9px/1 var(--f-mono); letter-spacing:.22em; text-transform:uppercase; color:var(--toxic)}
+  .row{margin-bottom:15px}
+  .rowhead{display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:5px}
+  .rowhead label{font-size:11.5px; color:var(--ink2)}
+  .rowhead output{font:600 11px/1 var(--f-mono); color:var(--ink); font-variant-numeric:tabular-nums}
+  .row .note{margin-top:3px; font:400 10px/1.45 var(--f-mono); color:var(--muted)}
+  input[type=range]{width:100%; height:20px; margin:0; background:transparent; -webkit-appearance:none; appearance:none; cursor:pointer}
+  input[type=range]::-webkit-slider-runnable-track{height:3px; background:var(--line2); border-radius:2px}
+  input[type=range]::-moz-range-track{height:3px; background:var(--line2); border-radius:2px}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:15px; height:15px; margin-top:-6px;
+    border-radius:50%; background:var(--toxic); border:2px solid #0a0f0d}
+  input[type=range]::-moz-range-thumb{width:15px; height:15px; border:2px solid #0a0f0d; border-radius:50%; background:var(--toxic)}
+  input[type=range]:focus-visible{outline:2px solid var(--cyan); outline-offset:3px}
+  .togs{display:flex; flex-direction:column; gap:1px; margin-bottom:10px}
+  .tog{display:flex; align-items:center; gap:9px; padding:7px 0; font-size:11.5px; color:var(--ink2); cursor:pointer}
+  .tog input{accent-color:var(--toxic); width:15px; height:15px; margin:0; flex:none}
+  .dbtns{display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:12px}
+  .dbtn{font:600 10px/1.1 var(--f-mono); letter-spacing:.04em; padding:9px 6px; border:1px solid var(--line2);
+    border-radius:3px; background:var(--panel2); color:var(--ink2); cursor:pointer; text-align:center}
+  .dbtn:hover{border-color:var(--toxic); color:var(--toxic)}
+  .dbtn.wide{grid-column:1 / -1}
+  .dbtn.on{border-color:var(--toxic); color:var(--toxic); background:rgba(142,230,74,.08)}
+  /* Thông báo vòng vây phải nằm trên mọi lớp HUD: cột chip nâng cấp bên trái dài dần theo
+     trận và tới cuối màn nó cắt ngang đúng chỗ này. Vẽ trên canvas thì luôn bị chip đè. */
+  .arenamsg{position:absolute; left:0; right:0; top:26%; z-index:40; pointer-events:none;
+    display:flex; flex-direction:column; align-items:center; gap:2px; text-align:center}
+  .am-title{font:700 clamp(20px,3.4vh,34px)/1.1 var(--f-display); letter-spacing:.04em; color:#ff6054;
+    text-shadow:0 2px 14px rgba(0,0,0,.95), 0 0 30px rgba(255,60,50,.5)}
+  .am-sub{font:600 12px/1.3 var(--f-mono); color:rgba(255,190,182,.82);
+    text-shadow:0 2px 10px rgba(0,0,0,.95)}
+  .am-count{font:700 clamp(46px,10vh,104px)/1 var(--f-display); color:#fff; margin-top:6px;
+    text-shadow:0 3px 20px rgba(0,0,0,.95), 0 0 40px rgba(255,60,50,.55);
+    animation:amtick 1s linear infinite}
+  @keyframes amtick{ 0%{transform:scale(1.22); opacity:.35} 35%{transform:scale(1); opacity:1}
+    100%{transform:scale(.96); opacity:.7} }
+  .dbtns.three{grid-template-columns:1fr 1fr 1fr}
+  .tablewrap{overflow-x:auto; margin-bottom:10px}
+  .wtable{width:100%; min-width:282px; border-collapse:collapse; font:500 10px/1 var(--f-mono); font-variant-numeric:tabular-nums}
+  .wtable th{text-align:right; font-weight:500; color:var(--muted); padding:4px 0 7px; letter-spacing:.04em}
+  .wtable th:first-child{text-align:left}
+  .wtable td{text-align:right; padding:6px 0; border-top:1px solid var(--line); color:var(--ink2)}
+  .wtable td:first-child{text-align:left; color:var(--ink)}
+  .wtable tr.sel td{color:var(--toxic)}
+  .pnote{font:400 10px/1.5 var(--f-mono); color:var(--muted); margin-bottom:12px}
+  .langsel{display:inline-flex; gap:0; margin-top:11px; border:1px solid var(--line2); border-radius:3px; overflow:hidden}
+  .card .langsel{margin:0 auto 18px}
+  .langbtn{font:600 10px/1 var(--f-mono); letter-spacing:.08em; padding:8px 12px; border:0;
+    background:transparent; color:var(--muted); cursor:pointer}
+  .langbtn + .langbtn{border-left:1px solid var(--line2)}
+  .langbtn:hover{color:var(--ink2)}
+  .langbtn.on{background:rgba(142,230,74,.16); color:var(--toxic)}
+  .langbtn:focus-visible{outline:2px solid var(--cyan); outline-offset:-2px}
+  .pbtns{display:flex; gap:8px; padding:14px 16px 0}
+  .pbtn{flex:1; font:600 10px/1 var(--f-mono); letter-spacing:.1em; text-transform:uppercase; padding:10px;
+    border:1px solid var(--line2); border-radius:3px; background:var(--panel2); color:var(--ink2); cursor:pointer}
+  .pbtn:hover{border-color:var(--toxic); color:var(--toxic)}
+  .paneltoggle{display:none}
+
+  /* Dưới ~1240px, sân khấu hẹp hơn 420px + hai cột HUD, nên khối đồng hồ căn giữa tuyệt đối
+     sẽ đè lên thanh máu và hộp súng. Cho nó về dòng riêng phía trên thay vì chồng lên. */
+  @media (max-width:1240px){
+    .topcenter{position:static; transform:none; width:auto; align-items:center}
+  }
+  @media (max-width:880px){
+    .app{flex-direction:column}
+    .panel{position:absolute; inset:auto 0 0 0; width:auto; max-height:66%; border-left:0;
+      border-top:1px solid var(--line2); box-shadow:var(--shadow); z-index:8;
+      transform:translateY(101%); transition:transform .22s ease;
+      padding-bottom:calc(22px + env(safe-area-inset-bottom,0px))}
+    .panel.open{transform:translateY(0)}
+    .paneltoggle{display:block; position:absolute; right:14px; top:calc(14px + env(safe-area-inset-top,0px)); z-index:9;
+      font:600 10px/1 var(--f-mono); letter-spacing:.1em; text-transform:uppercase; padding:9px 12px;
+      border:1px solid var(--line2); border-radius:3px; background:rgba(14,22,18,.9); color:var(--ink2); cursor:pointer}
+    .hud{padding:12px}
+    .topcenter{position:static; transform:none; width:auto; align-items:flex-start; padding-right:84px; order:-1}
+    .timer{font-size:22px}
+    .bosswrap{align-items:flex-start}
+    .vitals{width:min(210px,52%)}
+    .upstack{width:min(210px,52%)}
+    .wpnbox{width:150px; padding:7px 9px}
+    .wpnname{font-size:13px}
+    .hintbar{display:none}
+  }
+  @media (prefers-reduced-motion:reduce){ .panel{transition:none} }
+</style>
+
+<div class="app">
+  <div class="stage" id="stage">
+    <canvas id="game"></canvas>
+
+    <div class="arenamsg" id="arenamsg" hidden>
+      <div class="am-title" data-i18n="arena.title"></div>
+      <div class="am-sub" data-i18n="arena.sub"></div>
+      <div class="am-count" id="am-count">3</div>
+    </div>
+
+    <div class="hud">
+      <div class="topcenter">
+        <div class="timer" id="timer">00:00</div>
+        <div class="timersub" id="timersub">Elite đầu tiên · 2:00</div>
+        <div class="bosswrap" id="bosswrap" hidden>
+          <div class="bossname" id="bossname">Thây Chúa</div>
+          <div class="bar bossbar"><i class="bossfill" id="bossfill"></i></div>
+        </div>
+      </div>
+
+      <div class="hud-top">
+        <div class="vitals">
+          <div class="bar hpwrap"><i class="hpfill" id="hpfill"></i><div class="bartext" id="hptext">100 / 100</div></div>
+          <div class="shieldbar" id="shieldbar" hidden><div class="shieldfill" id="shieldfill"></div><div class="shieldtext" id="shieldtext">Khiên sẵn sàng</div></div>
+          <div class="bar xpwrap"><i class="xpfill" id="xpfill"></i><div class="bartext" id="xptext">Cấp 1</div></div>
+          <div class="chips">
+            <div class="chip"><span data-i18n="hud.adv">Cao cấp</span> <b id="c-adv">0/5</b></div>
+            <div class="chip"><span data-i18n="hud.gold">Vàng</span> <b id="c-gold">0</b></div>
+            <div class="chip"><span data-i18n="hud.kills">Diệt</span> <b id="c-kills">0</b></div>
+            <div class="chip" id="c-mode"><span data-i18n="hud.aim">Ngắm</span> <b id="c-modev">—</b></div>
+            <div class="chip"><span data-i18n="hud.fps">FPS</span> <b id="c-fps">60</b></div>
+          </div>
+          <div class="upstack" id="upstack"></div>
+        </div>
+
+        <div class="wpnbox" id="wpnbox">
+          <div class="wpnname" id="w-name">SMG</div>
+          <div class="wpnstats">
+            <span data-i18n="wpn.turn">Tốc xoay</span><span id="w-turn">600°/s</span>
+            <span data-i18n="wpn.half">Quay 180°</span><span id="w-half">0,30 s</span>
+            <span data-i18n="wpn.dps">DPS</span><span id="w-dps">120</span>
+            <span id="w-steadyl" data-i18n="wpn.steady" hidden>Đứng yên</span><span id="w-steady" hidden>×1,0</span>
+          </div>
+          <div class="ammo" id="ammowrap">
+            <div class="ammonum" id="w-ammo">40 / 40</div>
+            <div class="ammobar"><div class="ammofill" id="ammofill"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hud-bottom">
+        <div class="hintbar">
+          <span data-i18n-html="hint.l1"></span><br>
+          <span data-i18n-html="hint.l2"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="touch" id="touch">
+      <div class="stickzone" id="stickzone"><div class="stick" id="stick"><div class="knob" id="knob"></div></div></div>
+      <div class="tbtns">
+        <button class="tbtn" id="btn-swap" type="button"><span data-i18n="hud.swap">Đổi súng</span><small id="btn-swap-n">2</small></button>
+      </div>
+    </div>
+
+    <button class="paneltoggle" id="paneltoggle" type="button" data-i18n="ui.tune">Tune</button>
+
+    <div class="overlay on" id="ov-start">
+      <div class="card">
+        <div class="langsel">
+          <button class="langbtn on" type="button" data-lang="vi">Tiếng Việt</button>
+          <button class="langbtn" type="button" data-lang="en">English</button>
+        </div>
+        <div class="kicker" data-i18n="start.kicker">Prototype · Khu vực 1 · 10 phút</div>
+        <h1>Zombie Frontline</h1>
+        <p data-i18n-html="start.body"></p>
+        <div class="keyguide">
+          <div><b data-i18n="start.g1t"></b><span data-i18n="start.g1d"></span></div>
+          <div><b data-i18n="start.g2t"></b><span data-i18n="start.g2d"></span></div>
+          <div><b data-i18n="start.g3t"></b><span data-i18n="start.g3d"></span></div>
+          <div><b data-i18n="start.g4t"></b><span data-i18n="start.g4d"></span></div>
+        </div>
+        <button class="btn" id="btn-start" type="button" data-i18n="start.btn">Bắt đầu</button>
+      </div>
+    </div>
+
+    <div class="overlay" id="ov-pick">
+      <div class="card">
+        <div class="kicker" id="pick-kicker"></div>
+        <h2 id="pick-title"></h2>
+        <p id="pick-note"></p>
+        <div class="picks" id="pick-list"></div>
+      </div>
+    </div>
+
+    <div class="overlay" id="ov-dead">
+      <div class="card">
+        <div class="kicker" style="color:var(--danger)" data-i18n="dead.kicker">Thất bại</div>
+        <h2 data-i18n="dead.title">Bạn đã gục</h2>
+        <p data-i18n="dead.body"></p>
+        <div class="runstats">
+          <div><span data-i18n="stat.survived"></span><b id="d-time">0:00</b></div>
+          <div><span data-i18n="stat.kills"></span><b id="d-kills">0</b></div>
+          <div><span data-i18n="stat.level"></span><b id="d-lvl">1</b></div>
+          <div><span data-i18n="stat.gold"></span><b id="d-gold">0</b></div>
+        </div>
+        <button class="btn" id="btn-retry" type="button" data-i18n="dead.btn">Chơi lại</button>
+      </div>
+    </div>
+
+    <div class="overlay" id="ov-win">
+      <div class="card">
+        <div class="kicker" data-i18n="win.kicker">Khu vực 1 đã sạch</div>
+        <h2 data-i18n="win.title">Hoàn thành khu vực</h2>
+        <p data-i18n="win.body"></p>
+        <div class="runstats">
+          <div><span data-i18n="stat.time"></span><b id="v-time">0:00</b></div>
+          <div><span data-i18n="stat.kills"></span><b id="v-kills">0</b></div>
+          <div><span data-i18n="stat.level"></span><b id="v-lvl">1</b></div>
+          <div><span data-i18n="stat.gold"></span><b id="v-gold">0</b></div>
+          <div><span data-i18n="stat.acc"></span><b id="v-acc">0%</b></div>
+        </div>
+        <button class="btn" id="btn-again" type="button" data-i18n="win.btn">Chơi lại</button>
+      </div>
+    </div>
+
+    <div class="overlay" id="ov-pause">
+      <div class="card">
+        <div class="kicker" data-i18n="pause.kicker">Tạm dừng</div>
+        <h2 data-i18n="pause.title">Đang nghỉ giữa hiệp</h2>
+        <p data-i18n="pause.body"></p>
+        <button class="btn" id="btn-resume" type="button" data-i18n="pause.btn">Tiếp tục</button>
+      </div>
+    </div>
+  </div>
+
+  <aside class="panel" id="panel">
+    <div class="phead">
+      <h2 data-i18n="panel.title">Bảng Tune</h2>
+      <p data-i18n="panel.note"></p>
+      <div class="langsel">
+        <button class="langbtn on" type="button" data-lang="vi">Tiếng Việt</button>
+        <button class="langbtn" type="button" data-lang="en">English</button>
+      </div>
+    </div>
+
+    <div class="grp">
+      <h3 data-i18n="panel.tools">Công cụ thử</h3>
+      <div class="row">
+        <div class="rowhead"><label for="s-time" data-i18n="panel.timeScale"></label><output id="o-time">1,0×</output></div>
+        <input type="range" id="s-time" min="1" max="5" step="0.5" value="1">
+        <div class="note" data-i18n="panel.timeScaleNote"></div>
+      </div>
+      <div class="dbtns">
+        <button class="dbtn" id="d-elite" type="button" data-i18n="btn.elite"></button>
+        <button class="dbtn" id="d-boss" type="button" data-i18n="btn.mini"></button>
+        <button class="dbtn" id="d-lvlup" type="button" data-i18n="btn.lvl3"></button>
+        <button class="dbtn" id="d-heal" type="button" data-i18n="btn.heal"></button>
+        <button class="dbtn" id="d-crate" type="button" data-i18n="btn.crate"></button>
+        <button class="dbtn" id="d-uniq" type="button" data-i18n="btn.uniq"></button>
+        <button class="dbtn wide" id="d-cratefar" type="button" data-i18n="btn.cratefar"></button>
+        <button class="dbtn wide" id="d-mainboss" type="button" data-i18n="btn.mainboss"></button>
+      </div>
+    </div>
+
+    <div class="grp">
+      <h3 data-i18n="panel.aim">Cơ chế ngắm</h3>
+      <div class="row">
+        <div class="rowhead"><label for="s-turn" data-i18n="panel.turnMul"></label><output id="o-turn">1,00×</output></div>
+        <input type="range" id="s-turn" min="0.25" max="3" step="0.05" value="1">
+        <div class="note" id="n-turn"></div>
+      </div>
+      <div class="row">
+        <div class="rowhead"><label for="s-arc" data-i18n="panel.arc"></label><output id="o-arc">180°</output></div>
+        <input type="range" id="s-arc" min="60" max="360" step="10" value="180">
+        <div class="note" id="n-arc"></div>
+      </div>
+      <div class="row">
+        <div class="rowhead"><label for="s-lead" data-i18n="panel.lead"></label><output id="o-lead">100%</output></div>
+        <input type="range" id="s-lead" min="0" max="1" step="0.05" value="1">
+      </div>
+    </div>
+
+    <div class="grp">
+      <h3 data-i18n="panel.pace">Nhịp trận</h3>
+      <div class="row">
+        <div class="rowhead"><label for="s-dens" data-i18n="panel.density"></label><output id="o-dens">1,00×</output></div>
+        <input type="range" id="s-dens" min="0.4" max="2.5" step="0.1" value="1">
+      </div>
+      <div class="row">
+        <div class="rowhead"><label for="s-pspd" data-i18n="panel.pspeed"></label><output id="o-pspd">170 px/s</output></div>
+        <input type="range" id="s-pspd" min="100" max="300" step="5" value="170">
+        <div class="note" id="n-pspd"></div>
+      </div>
+      <div class="row">
+        <div class="rowhead"><label for="s-zspd" data-i18n="panel.zspeed"></label><output id="o-zspd">1,00×</output></div>
+        <input type="range" id="s-zspd" min="0.4" max="2" step="0.05" value="1">
+      </div>
+      <div class="row">
+        <div class="rowhead"><label for="s-flank" data-i18n="panel.flank"></label><output id="o-flank">70%</output></div>
+        <input type="range" id="s-flank" min="0" max="1" step="0.05" value="0.7">
+      </div>
+      <div class="row">
+        <div class="rowhead"><label for="s-xpc" data-i18n="panel.xpcurve"></label><output id="o-xpc">1,00×</output></div>
+        <input type="range" id="s-xpc" min="0.3" max="2.5" step="0.05" value="1">
+        <div class="note" id="n-xpc"></div>
+      </div>
+      <div class="row">
+        <div class="rowhead"><label for="s-arena" data-i18n="panel.arena"></label><output id="o-arena">560</output></div>
+        <input type="range" id="s-arena" min="300" max="1000" step="20" value="560">
+        <div class="note" data-i18n="panel.arenaNote"></div>
+      </div>
+    </div>
+
+    <div class="grp">
+      <h3 data-i18n="panel.area">Khu vực</h3>
+      <div class="note" data-i18n="panel.areaNote"></div>
+      <div class="dbtns three">
+        <button class="dbtn" id="th-farm" type="button" data-theme="farm" data-i18n="area.farm"></button>
+        <button class="dbtn" id="th-war" type="button" data-theme="war" data-i18n="area.war"></button>
+        <button class="dbtn" id="th-city" type="button" data-theme="city" data-i18n="area.city"></button>
+      </div>
+    </div>
+
+    <div class="grp">
+      <h3 data-i18n="panel.options">Tuỳ chọn</h3>
+      <div class="togs">
+        <label class="tog"><input type="checkbox" id="t-rear" checked> <span data-i18n="tog.rear"></span></label>
+        <label class="tog"><input type="checkbox" id="t-cone" checked> <span data-i18n="tog.cone"></span></label>
+        <label class="tog"><input type="checkbox" id="t-sound" checked> <span data-i18n="tog.sound"></span></label>
+        <label class="tog"><input type="checkbox" id="t-shake" checked> <span data-i18n="tog.shake"></span></label>
+        <label class="tog"><input type="checkbox" id="t-god"> <span data-i18n="tog.god"></span></label>
+      </div>
+    </div>
+
+    <div class="grp">
+      <h3 data-i18n="panel.guns">Bảng súng</h3>
+      <div class="tablewrap">
+        <table class="wtable"><thead><tr>
+          <th data-i18n="th.gun"></th><th data-i18n="th.turn"></th><th data-i18n="th.half"></th>
+          <th data-i18n="th.dps"></th><th data-i18n="th.range"></th>
+        </tr></thead>
+        <tbody id="wtbody"></tbody></table>
+      </div>
+      <div class="pnote" data-i18n="panel.gunsNote"></div>
+    </div>
+
+    <div class="pbtns">
+      <button class="pbtn" id="btn-reset" type="button" data-i18n="btn.reset"></button>
+      <button class="pbtn" id="btn-restart" type="button" data-i18n="btn.restart"></button>
+    </div>
+  </aside>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ================================================================ i18n
+  // Mọi chuỗi hiển thị đều nằm ở đây. Markup dùng data-i18n / data-i18n-html,
+  // code dùng t("khoá", {tham_số}). Thêm ngôn ngữ mới = thêm một khối vào I18N.
+  var I18N = {
+    vi: {
+      "lang.vi":"Tiếng Việt", "lang.en":"English", "ui.tune":"Tune",
+
+      "hud.adv":"Cao cấp", "hud.gold":"Vàng", "hud.kills":"Diệt", "hud.aim":"Ngắm", "hud.fps":"FPS",
+      "hud.level":"Cấp {n}", "hud.swap":"Đổi súng",
+      "hud.shieldReady":"Khiên sẵn sàng", "hud.shieldCd":"Khiên hồi {s}s",
+      "aim.none":"trống", "aim.front":"trước mặt", "aim.rear":"quay ra sau",
+      "wpn.turn":"Tốc xoay", "wpn.half":"Quay 180°", "wpn.dps":"DPS", "wpn.steady":"Đứng yên",
+      "wpn.steadyReady":"×{m} sẵn sàng", "wpn.steadyMoving":"đang di chuyển", "wpn.reloading":"nạp đạn…",
+      "sub.mini":"Trùm phụ · {n}", "sub.boss":"Trùm chính · {n}",
+      "sub.crate":"Nhặt hộp nâng cấp", "sub.next":"{what} · {time}",
+      "sub.miniName":"Trùm phụ", "sub.eliteName":"Elite", "sub.last":"Hạ nốt elite cuối",
+      "hint.l1":"<kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> hoặc <kbd>WASD</kbd> di chuyển · súng tự khoá zombie gần nhất trong 180° trước mặt",
+      "hint.l2":"<kbd>1</kbd>–<kbd>5</kbd> / <kbd>Q</kbd> đổi súng · <kbd>P</kbd> tạm dừng · chạy qua hộp vàng để mở nâng cấp cao cấp, qua bình máu và nam châm để nhặt",
+
+      "start.kicker":"Prototype · Khu vực 1 · 10 phút",
+      "start.body":"Không có hỗ trợ ngắm — đạn bay đúng theo nòng. Nhân vật <b>tự khoá zombie gần nhất trong 180° trước mặt</b>, trước mặt sạch thì tự quay ra sau. Mỗi khẩu súng có tốc độ xoay riêng, khẩu càng mạnh càng quay chậm.",
+      "start.g1t":"Mỗi 2 phút · 1 Elite",
+      "start.g1d":"Năm con, mỗi con một cơ chế riêng. Giết được thì rơi hộp nâng cấp cao cấp.",
+      "start.g2t":"Phút 5 · Trùm phụ",
+      "start.g2d":"Thây Chúa xuất hiện. Hạ được thì rơi hộp tím: nâng cấp độc nhất định hình cả bản build.",
+      "start.g3t":"Ngọc XP · nâng cấp lẻ",
+      "start.g3d":"Zombie chết rơi ngọc, tự bay vào người. Đủ ngọc thì lên cấp và chọn 1 trong 3 hiệu ứng đơn.",
+      "start.g4t":"Phút 10 · Elite cuối",
+      "start.g4d":"Hạ nó và nhặt hộp thứ năm là kết thúc màn.",
+      "start.btn":"Bắt đầu",
+
+      "pick.lvlKicker":"Lên cấp {n}", "pick.lvlTitle":"Chọn một nâng cấp",
+      "pick.lvlNote":"Nâng cấp lẻ, chỉ một hiệu ứng. Hộp cao cấp từ elite mới nâng cả nhóm.",
+      "pick.crateKicker":"Hộp nâng cấp cao cấp · {a}/{b}", "pick.crateTitle":"Chọn một nhóm để nâng",
+      "pick.crateNote":"Nâng toàn bộ hiệu ứng trong nhóm cùng một lúc. Có thể dồn cả 5 lần vào một nhóm.",
+      "pick.uniKicker":"Trùm phụ đã ngã · Nâng cấp độc nhất", "pick.uniTitle":"Chọn hướng đi của bản build",
+      "pick.uniNote":"Chỉ chọn được một lần trong cả lượt chơi, và không đổi lại được.",
+      "pick.rank":"Cấp {a} → {b}", "pick.max":"tối đa",
+
+      "dead.kicker":"Thất bại", "dead.title":"Bạn đã gục",
+      "dead.body":"Mở bảng Tune để tua nhanh thời gian, triệu hồi elite sớm hoặc bật bất tử khi cần đo cảm giác chơi.",
+      "dead.btn":"Chơi lại",
+      "win.kicker":"Khu vực 1 đã sạch", "win.title":"Hoàn thành khu vực",
+      "win.body":"Trong bản thật, đây là lúc tính sao, trả vàng với nguyên liệu, và trừ thể lực cho lượt tiếp theo.",
+      "win.btn":"Chơi lại",
+      "pause.kicker":"Tạm dừng", "pause.title":"Đang nghỉ giữa hiệp",
+      "pause.body":"Chỉnh thông số trong bảng Tune rồi quay lại — thay đổi có hiệu lực ngay lập tức.",
+      "pause.btn":"Tiếp tục",
+      "stat.survived":"Trụ được", "stat.kills":"Diệt", "stat.level":"Cấp",
+      "stat.gold":"Vàng", "stat.time":"Thời gian", "stat.acc":"Chính xác",
+
+      "panel.title":"Bảng Tune",
+      "panel.note":"Một màn dài 10 phút nên hãy dùng nút tua nhanh và các nút triệu hồi bên dưới thay vì ngồi chờ.",
+      "panel.tools":"Công cụ thử", "panel.timeScale":"Tua nhanh thời gian",
+      "panel.timeScaleNote":"Tăng tốc cả trận, kể cả lịch ra elite. Dùng để tới phút thứ 8 trong hai phút thật.",
+      "btn.elite":"Triệu hồi Elite", "btn.mini":"Gọi Trùm phụ", "btn.lvl3":"Lên 3 cấp",
+      "btn.heal":"Hồi đầy máu", "btn.crate":"Hộp cao cấp", "btn.uniq":"Nâng cấp độc nhất",
+      "btn.cratefar":"Thả hộp ở xa 300px", "btn.mainboss":"Gọi Trùm chính",
+      "panel.aim":"Cơ chế ngắm", "panel.turnMul":"Hệ số tốc độ xoay",
+      "panel.turnNote":"Quay 180°: Minigun {a} s · SMG {b} s",
+      "panel.arc":"Góc quét trước mặt",
+      "panel.arcNote":"Quét {deg}° phía trước. Ngoài vùng này chỉ bị bắn khi trước mặt đã sạch.",
+      "panel.arc360":"360° = tự ngắm mọi hướng. Không còn khái niệm trước hay sau lưng.",
+      "panel.lead":"Dự đoán đường đi mục tiêu",
+      "panel.pace":"Nhịp trận", "panel.density":"Mật độ zombie", "panel.pspeed":"Tốc độ người chơi",
+      "panel.pspeedNote":"Runner: {r} px/s · Walker: {w} px/s",
+      "panel.xpcurve":"Độ dốc kinh nghiệm",
+      "panel.xpcurveNote":"Cấp 2 cần {a} · cấp 5 cần {b} · cấp 15 cần {c} · cấp 25 cần {d}",
+      "panel.area":"Khu vực",
+      "panel.areaNote":"Hiện mới đổi bảng màu và vật trang trí. Khi có art sẽ đổi cả ảnh lát nền và bộ da zombie theo khu vực.",
+      "area.farm":"Nông trại", "area.war":"Chiến trường", "area.city":"Thành phố",
+      "panel.arena":"Bán kính vòng vây",
+      "panel.arenaNote":"Trùm cuối xuất hiện là quái thường chết sạch và người chơi bị nhốt trong vòng bán kính này.",
+      "boss.name":"Bạo Chúa",
+      "arena.title":"TRÙM CUỐI XUẤT HIỆN",
+      "arena.sub":"Vòng vây khép lại — không còn đường lui",
+      "arena.go":"CHIẾN!",
+      "panel.zspeed":"Hệ số tốc độ zombie", "panel.flank":"Tỉ lệ Runner vòng sau lưng",
+      "panel.options":"Tuỳ chọn",
+      "tog.rear":"Tự quay bắn ra sau khi trước mặt trống", "tog.cone":"Hiện góc quét & mục tiêu đang khoá",
+      "tog.sound":"Âm thanh", "tog.shake":"Rung màn hình", "tog.god":"Bất tử",
+      "panel.guns":"Bảng súng", "th.gun":"Súng", "th.turn":"Xoay", "th.half":"180°",
+      "th.dps":"DPS", "th.range":"Tầm",
+      "panel.gunsNote":"Bấm một hàng để đổi súng. Bản thật giới hạn 2 khẩu mỗi lượt.",
+      "btn.reset":"Mặc định", "btn.restart":"Chơi lại",
+
+      "elite.armor":"Bọc Thép", "elite.splitter":"Phân Bào", "elite.summoner":"Đầu Sỏ",
+      "elite.charger":"Lao Húc", "elite.shield":"Khiên Lực", "mini.name":"Thây Chúa",
+
+      "fx.dmg.n":"Sát thương",   "fx.dmg.d":"+18% sát thương mọi loại đạn",
+      "fx.size.n":"Cỡ đạn",      "fx.size.d":"Đạn to thêm 2,4 px và +10% sát thương",
+      "fx.multi.n":"Đa nòng",    "fx.multi.d":"Bắn thêm 1 đường đạn, xoè 9°",
+      "fx.pierce.n":"Đạn xuyên", "fx.pierce.d":"Đạn xuyên thêm 1 zombie",
+      "fx.bounce.n":"Đạn nảy",   "fx.bounce.d":"Đạn nảy thêm 1 lần sang zombie bên cạnh",
+      "fx.rate.n":"Tốc độ bắn",  "fx.rate.d":"+22% nhịp bắn",
+      "fx.mag.n":"Băng đạn",     "fx.mag.d":"+50% cỡ băng, thay đạn nhanh hơn 20%",
+      "fx.hp.n":"Máu tối đa",    "fx.hp.d":"+30 máu tối đa và hồi ngay chừng đó",
+      "fx.leech.n":"Hút máu",    "fx.leech.d":"Hồi 1 máu mỗi 25 sát thương gây ra",
+      "fx.speed.n":"Tốc chạy",   "fx.speed.d":"+14% tốc độ di chuyển",
+      "fx.shield.n":"Khiên bảo hộ", "fx.shield.d":"Chặn trọn 1 đòn của quái. Cấp 1 hồi 60 giây, mỗi cấp sau giảm 5 giây",
+      "fx.hex.n":"Nổ lục giác",  "fx.hex.d":"Zombie chết bắn ra 6 viên đạn theo 6 hướng đều nhau",
+      "fx.rear.n":"Nòng phụ sau","fx.rear.d":"Bắn thêm 1 viên thẳng ra sau lưng",
+      "fx.pierce.rail":"Xuyên Phá đã xuyên sẵn mọi thứ — cấp này đổi thành +10% sát thương",
+      "fx.bounce.rail":"Xuyên Phá đổi cấp này thành: hết tầm đạn quay đầu bay ngược thêm 1 lượt",
+
+      "grp.power.n":"Hoả Lực",     "grp.power.note":"Mọi viên đạn nặng đô hơn",
+      "grp.spread.n":"Đa Hướng",   "grp.spread.note":"Thêm đường đạn, thêm nòng sau lưng, xác nổ thành 6 tia",
+      "grp.pen.n":"Xuyên & Nảy",   "grp.pen.note":"Một viên ăn nhiều mạng",
+      "grp.rof.n":"Nhịp Bắn",      "grp.rof.note":"Bắn dày hơn, ít phải thay đạn",
+      "grp.surv.n":"Sinh Tồn",     "grp.surv.note":"Trâu hơn, nhanh hơn, tự hồi máu, khiên hồi nhanh hơn",
+
+      "uni.heavy.n":"Đạn Nặng",
+      "uni.heavy.d":"Đạn to hơn hẳn và nện đau hơn, đổi lại bắn chậm đi.",
+      "uni.heavy.list":["Sát thương ×1,7","Bán kính đạn +5 px","Tốc độ bắn ×0,60"],
+      "uni.swarm.n":"Bão Đạn",
+      "uni.swarm.d":"Ba đường đạn bắn như mưa, nhưng mỗi viên nhẹ hều.",
+      "uni.swarm.list":["+2 đường đạn","Tốc độ bắn ×1,60","Sát thương ×0,55","Cỡ đạn ×0,60"],
+      "uni.rail.n":"Xuyên Phá",
+      "uni.rail.d":"Cả băng đạn chỉ còn đúng một viên, nhưng viên đó siêu to, bay xa hơn tầm nhìn nhiều lần và xuyên thủng mọi thứ trên đường. Nâng cấp sau không tăng được số đạn trong băng, nhưng vẫn tăng được nhịp bắn và tốc độ thay đạn.",
+      "uni.rail.list":["Băng đạn cố định 1 viên","Cả chùm đạn ghém dồn vào một viên","Bán kính đạn +9 px",
+                       "Tầm bắn 4000 (xa hơn màn hình nhiều lần)","Xuyên qua mọi zombie","Sát thương ×4,5",
+                       "Lên nòng chớp nhoáng 0,22 giây","Tốc độ bắn ×0,55",
+                       "Đạn xuyên đổi thành +10% sát thương mỗi cấp",
+                       "Đạn nảy đổi thành quay đầu bay ngược thêm 1 lượt mỗi cấp"],
+      "uni.tank.n":"Khổng Lồ",
+      "uni.tank.d":"Thân hình to gấp rưỡi nên dễ ăn đòn hơn, bù lại trâu và tự liền da.",
+      "uni.tank.list":["Cỡ nhân vật ×1,5","Máu tối đa ×1,6","Hồi 15% máu mỗi 25 giây"]
+    },
+
+    en: {
+      "lang.vi":"Tiếng Việt", "lang.en":"English", "ui.tune":"Tune",
+
+      "hud.adv":"Crates", "hud.gold":"Gold", "hud.kills":"Kills", "hud.aim":"Aim", "hud.fps":"FPS",
+      "hud.level":"Level {n}", "hud.swap":"Swap gun",
+      "hud.shieldReady":"Shield ready", "hud.shieldCd":"Shield {s}s",
+      "aim.none":"none", "aim.front":"front", "aim.rear":"turning back",
+      "wpn.turn":"Turn rate", "wpn.half":"180° turn", "wpn.dps":"DPS", "wpn.steady":"Standing still",
+      "wpn.steadyReady":"×{m} ready", "wpn.steadyMoving":"moving", "wpn.reloading":"reloading…",
+      "sub.mini":"Mini-boss · {n}", "sub.boss":"Final boss · {n}",
+      "sub.crate":"Grab the crate", "sub.next":"{what} · {time}",
+      "sub.miniName":"Mini-boss", "sub.eliteName":"Elite", "sub.last":"Finish the last elite",
+      "hint.l1":"<kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> or <kbd>WASD</kbd> to move · the gun auto-locks the nearest zombie inside the 180° front arc",
+      "hint.l2":"<kbd>1</kbd>–<kbd>5</kbd> / <kbd>Q</kbd> swap gun · <kbd>P</kbd> pause · walk over the gold crate for an advanced upgrade, over medkits and magnets to grab them",
+
+      "start.kicker":"Prototype · Zone 1 · 10 minutes",
+      "start.body":"No aim assist — bullets fly exactly where the barrel points. Your character <b>locks the nearest zombie inside the 180° front arc</b>, and turns around on its own once the front is clear. Every gun swings at its own speed: the harder it hits, the slower it turns.",
+      "start.g1t":"Every 2 min · one Elite",
+      "start.g1d":"Five of them, each a different problem. Kill one and it drops an advanced upgrade crate.",
+      "start.g2t":"Minute 5 · Mini-boss",
+      "start.g2d":"The Corpse Lord shows up. Kill it for a purple crate: a unique upgrade that defines your whole build.",
+      "start.g3t":"XP gems · single upgrades",
+      "start.g3d":"Zombies drop gems that fly straight to you. Enough gems levels you up — then pick 1 of 3 single effects.",
+      "start.g4t":"Minute 10 · last Elite",
+      "start.g4d":"Kill it, take the fifth crate, and the run is over.",
+      "start.btn":"Start",
+
+      "pick.lvlKicker":"Level up · {n}", "pick.lvlTitle":"Pick an upgrade",
+      "pick.lvlNote":"A single effect. Only the elite crates raise a whole group at once.",
+      "pick.crateKicker":"Advanced crate · {a}/{b}", "pick.crateTitle":"Pick a group to raise",
+      "pick.crateNote":"Raises every effect in the group at once. You can pour all 5 crates into one group.",
+      "pick.uniKicker":"Mini-boss down · Unique upgrade", "pick.uniTitle":"Choose your build",
+      "pick.uniNote":"One per run, and it cannot be undone.",
+      "pick.rank":"Rank {a} → {b}", "pick.max":"maxed",
+
+      "dead.kicker":"Wiped", "dead.title":"You went down",
+      "dead.body":"Open the Tune panel to fast-forward time, summon elites early, or switch on invincibility while you measure the feel.",
+      "dead.btn":"Play again",
+      "win.kicker":"Zone 1 cleared", "win.title":"Zone complete",
+      "win.body":"In the real game this is where stars, gold, materials and the energy cost of the next run get settled.",
+      "win.btn":"Play again",
+      "pause.kicker":"Paused", "pause.title":"Taking a breather",
+      "pause.body":"Change anything in the Tune panel and come back — every change applies immediately.",
+      "pause.btn":"Resume",
+      "stat.survived":"Survived", "stat.kills":"Kills", "stat.level":"Level",
+      "stat.gold":"Gold", "stat.time":"Time", "stat.acc":"Accuracy",
+
+      "panel.title":"Tune panel",
+      "panel.note":"A run lasts 10 minutes, so use the fast-forward slider and the summon buttons instead of waiting it out.",
+      "panel.tools":"Test tools", "panel.timeScale":"Fast-forward",
+      "panel.timeScaleNote":"Speeds up the whole run, elite schedule included. Reach minute 8 in two real minutes.",
+      "btn.elite":"Summon Elite", "btn.mini":"Summon Mini-boss", "btn.lvl3":"Gain 3 levels",
+      "btn.heal":"Full heal", "btn.crate":"Advanced crate", "btn.uniq":"Unique upgrade",
+      "btn.cratefar":"Drop a crate 300px away", "btn.mainboss":"Summon the Tyrant",
+      "panel.aim":"Aiming", "panel.turnMul":"Turn rate multiplier",
+      "panel.turnNote":"180° turn: Minigun {a} s · SMG {b} s",
+      "panel.arc":"Front scan arc",
+      "panel.arcNote":"Scans {deg}° ahead. Anything outside only gets shot once the front is clear.",
+      "panel.arc360":"360° = auto-aim in every direction. Front and back stop meaning anything.",
+      "panel.lead":"Target lead prediction",
+      "panel.pace":"Pressure", "panel.density":"Zombie density", "panel.pspeed":"Player speed",
+      "panel.pspeedNote":"Runner: {r} px/s · Walker: {w} px/s",
+      "panel.xpcurve":"XP curve steepness",
+      "panel.xpcurveNote":"Level 2 costs {a} · level 5 costs {b} · level 15 costs {c} · level 25 costs {d}",
+      "panel.area":"Area",
+      "panel.areaNote":"For now this only swaps the palette and the scenery props. Once art lands it will swap the ground tile and the zombie skins too.",
+      "area.farm":"Farm", "area.war":"Battlefield", "area.city":"City",
+      "panel.arena":"Arena radius",
+      "panel.arenaNote":"When the final boss lands, every ordinary zombie dies at once and you are sealed inside a ring this wide.",
+      "boss.name":"The Tyrant",
+      "arena.title":"FINAL BOSS",
+      "arena.sub":"The ring closes — nowhere left to run",
+      "arena.go":"FIGHT!",
+      "panel.zspeed":"Zombie speed multiplier", "panel.flank":"Runners that flank you",
+      "panel.options":"Options",
+      "tog.rear":"Turn around and shoot when the front is clear", "tog.cone":"Show scan arc & locked target",
+      "tog.sound":"Sound", "tog.shake":"Screen shake", "tog.god":"Invincible",
+      "panel.guns":"Gun table", "th.gun":"Gun", "th.turn":"Turn", "th.half":"180°",
+      "th.dps":"DPS", "th.range":"Range",
+      "panel.gunsNote":"Click a row to swap. The real game limits you to 2 guns per run.",
+      "btn.reset":"Defaults", "btn.restart":"Restart",
+
+      "elite.armor":"Bulwark", "elite.splitter":"Splitter", "elite.summoner":"Ringleader",
+      "elite.charger":"Charger", "elite.shield":"Shieldbearer", "mini.name":"Corpse Lord",
+
+      "fx.dmg.n":"Damage",      "fx.dmg.d":"+18% damage on every bullet",
+      "fx.size.n":"Bullet size","fx.size.d":"Bullets 2.4 px bigger, and +10% damage",
+      "fx.multi.n":"Extra line","fx.multi.d":"One more line of fire, fanned 9°",
+      "fx.pierce.n":"Piercing", "fx.pierce.d":"Bullets pierce one more zombie",
+      "fx.bounce.n":"Ricochet", "fx.bounce.d":"Bullets bounce to one more nearby zombie",
+      "fx.rate.n":"Fire rate",  "fx.rate.d":"+22% fire rate",
+      "fx.mag.n":"Magazine",    "fx.mag.d":"+50% magazine size, 20% faster reload",
+      "fx.hp.n":"Max HP",       "fx.hp.d":"+30 max HP, healed on the spot",
+      "fx.leech.n":"Lifesteal", "fx.leech.d":"Heal 1 HP per 25 damage dealt",
+      "fx.speed.n":"Move speed","fx.speed.d":"+14% movement speed",
+      "fx.shield.n":"Guard shield", "fx.shield.d":"Blocks one full hit. 60 s cooldown at rank 1, 5 s less per rank",
+      "fx.hex.n":"Hex burst",   "fx.hex.d":"Corpses fire 6 bullets in 6 even directions",
+      "fx.rear.n":"Rear barrel","fx.rear.d":"Fires one extra bullet straight backwards",
+      "fx.pierce.rail":"Railshot already pierces everything — this rank becomes +10% damage instead",
+      "fx.bounce.rail":"Railshot turns this rank into one more return trip — the round turns around at max range",
+
+      "grp.power.n":"Firepower",  "grp.power.note":"Every bullet hits harder",
+      "grp.spread.n":"Spread",    "grp.spread.note":"More lines, a rear barrel, corpses bursting into 6 shots",
+      "grp.pen.n":"Pierce & Bounce", "grp.pen.note":"One bullet, many kills",
+      "grp.rof.n":"Rate of Fire", "grp.rof.note":"Shoot more, reload less",
+      "grp.surv.n":"Survival",    "grp.surv.note":"Tougher, faster, self-healing, quicker shield",
+
+      "uni.heavy.n":"Heavy Rounds",
+      "uni.heavy.d":"Far bigger rounds that hit much harder, but you shoot a lot slower.",
+      "uni.heavy.list":["Damage ×1.7","Bullet radius +5 px","Fire rate ×0.60"],
+      "uni.swarm.n":"Bullet Storm",
+      "uni.swarm.d":"Three lines of fire pouring out at once, but every round is feather-light.",
+      "uni.swarm.list":["+2 lines of fire","Fire rate ×1.60","Damage ×0.55","Bullet size ×0.60"],
+      "uni.rail.n":"Railshot",
+      "uni.rail.d":"Your magazine holds exactly one round, but that round is enormous, flies several screens deep and punches through everything on the way. Later upgrades cannot add rounds to the magazine, but fire rate and reload speed still work.",
+      "uni.rail.list":["Magazine locked to 1 round","The whole shotgun spread folds into one slug","Bullet radius +9 px",
+                       "Range 4000 — several screens deep","Pierces every zombie","Damage ×4.5",
+                       "Snap 0.22 s chambering","Fire rate ×0.55",
+                       "Piercing rank becomes +10% damage each",
+                       "Ricochet rank becomes one more return trip each"],
+      "uni.tank.n":"Titan",
+      "uni.tank.d":"Half again as large, so you are far easier to hit — but you are tough and you knit yourself back together.",
+      "uni.tank.list":["Body size ×1.5","Max HP ×1.6","Heal 15% HP every 25 s"]
+    }
+  };
+
+  var LANG = "vi";
+  try { var sl = localStorage.getItem("zf_lang"); if (sl && I18N[sl]) LANG = sl; } catch(e){}
+
+  function t(key, p){
+    var s = I18N[LANG][key];
+    if (s == null) s = I18N.vi[key];
+    if (s == null) return key;
+    if (p) for (var k in p) s = s.split("{" + k + "}").join(p[k]);
+    return s;
+  }
+  function tList(key){ return I18N[LANG][key] || I18N.vi[key] || []; }
+
+  function applyI18n(){
+    document.documentElement.lang = LANG;
+    var a = document.querySelectorAll("[data-i18n]"), i;
+    for (i = 0; i < a.length; i++) a[i].textContent = t(a[i].getAttribute("data-i18n"));
+    var b = document.querySelectorAll("[data-i18n-html]");
+    for (i = 0; i < b.length; i++) b[i].innerHTML = t(b[i].getAttribute("data-i18n-html"));
+    var c = document.querySelectorAll(".langbtn");
+    for (i = 0; i < c.length; i++)
+      c[i].classList.toggle("on", c[i].getAttribute("data-lang") === LANG);
+  }
+  function setLang(l){
+    if (!I18N[l] || l === LANG) return;
+    LANG = l;
+    try { localStorage.setItem("zf_lang", l); } catch(e){}
+    applyI18n();
+    refreshNotes();
+    if (G){
+      renderUpStack();
+      updateHUD();
+      // tên trùm phụ được ghi một lần lúc nó xuất hiện, phải dịch lại tại đây
+      if (G.bossRef && !G.bossRef.dead) $("bossname").textContent = t(G.bossKey);
+      if (G.state === "pick") renderPick();
+    }
+  }
+  document.addEventListener("click", function(e){
+    var el = e.target.closest ? e.target.closest(".langbtn") : null;
+    if (el) setLang(el.getAttribute("data-lang"));
+  });
+
+  // ================================================================ data
+  var LEVEL_TIME = 600;                                // 10 phút
+  var ELITE_TIMES = [120, 240, 360, 480, 600];
+  var MINI_TIME = 300;                                 // trùm phụ ở phút thứ 5
+  var ADV_TOTAL = ELITE_TIMES.length;
+
+  var WEAPONS = [
+    { id:"smg", name:"SMG", color:"#8ee64a", turn:600, rate:0.075, dmg:9, pellets:1, spread:6,
+      bspeed:620, range:340, pierce:0, mag:40, reload:1.3, kb:14, shake:0.9, spin:0, trail:5 },
+    { id:"rifle", name:"Rifle", color:"#4ec9e0", turn:480, rate:0.14, dmg:23, pellets:1, spread:2,
+      bspeed:780, range:530, pierce:1, mag:30, reload:1.6, kb:22, shake:1.6, spin:0, trail:9 },
+    { id:"shotgun", name:"Shotgun", color:"#ffb340", turn:400, rate:0.78, dmg:13, pellets:8, spread:18,
+      bspeed:520, range:210, pierce:0, mag:6, reload:2.0, kb:130, shake:5.0, spin:0, trail:4 },
+    { id:"minigun", name:"Minigun", color:"#ff7a4e", turn:180, rate:0.05, dmg:11, pellets:1, spread:9,
+      bspeed:700, range:430, pierce:0, mag:150, reload:3.0, kb:9, shake:1.1, spin:0.8, trail:5 },
+    // steady: thưởng sát thương khi người chơi đứng yên đủ lâu — chất riêng của sniper
+    { id:"sniper", name:"Sniper", color:"#cfe8ff", turn:240, rate:1.05, dmg:95, pellets:1, spread:0.6,
+      bspeed:1500, range:1000, pierce:2, mag:5, reload:2.2, kb:70, shake:3.6, spin:0, trail:26, steady:1.8 }
+  ];
+  var STEADY_AFTER = 0.5;
+  WEAPONS.forEach(function(w){ w.dps = Math.round(w.dmg * w.pellets / w.rate); });
+
+  var ZTYPE = {
+    walker: { hp:42, speed:52,  r:13, dmg:9, color:"#6f9a5c", dark:"#3c5733", touch:0.7, xp:3 },
+    runner: { hp:24, speed:105, r:11, dmg:7, color:"#c95f7a", dark:"#6e2f42", touch:0.55, xp:4 }
+  };
+
+  // five elites, each one a different problem to solve
+  var ELITES = [
+    { k:"armor",    c:"#a8b6c0", dark:"#4a555d", hp:520,  speed:40, r:26, dmg:18, turn:70 },
+    { k:"splitter", c:"#86d194", dark:"#356b42", hp:980,  speed:56, r:27, dmg:16, turn:200 },
+    { k:"summoner", c:"#c285e6", dark:"#5b3570", hp:1450, speed:34, r:28, dmg:18, turn:160 },
+    { k:"charger",  c:"#f08a52", dark:"#7a3719", hp:1950, speed:48, r:27, dmg:26, turn:220 },
+    { k:"shield",   c:"#5fd4e8", dark:"#1f5f6e", hp:2500, speed:46, r:28, dmg:20, turn:180 }
+  ];
+
+  // ---- upgrade effects. Tên và mô tả nằm trong từ điển i18n, tra bằng khoá "fx.<id>.n" / ".d"
+  var FX_MAX = 5;   // mọi hiệu ứng đều dừng ở cấp 5; đạt trần là biến khỏi danh sách chọn
+  var FX = {};
+  ["dmg","size","multi","pierce","bounce","rate","mag","hp","leech","speed","shield","hex","rear"]
+    .forEach(function(k){ FX[k] = { max:FX_MAX }; });
+
+  // nâng cấp độc nhất từ trùm phụ — chỉ chọn được một lần mỗi lượt và định hình cả bản build
+  var UNIQUES = {
+    heavy: { c:"#ff7a4e", dmgMul:1.7, radAdd:5, fireMul:0.60 },
+    swarm: { c:"#8ee64a", linesAdd:2, fireMul:1.60, dmgMul:0.55, radMul:0.60 },
+    rail:  { c:"#4ec9e0", oneShot:true, radAdd:9, dmgMul:4.5, fireMul:0.55, reloadFixed:0.22 },
+    tank:  { c:"#b07cff", bodyScale:1.5, hpMul:1.6, regen:25 }
+  };
+
+  var MINI = { c:"#d4566f", dark:"#5e1f2c", hp:3400, speed:48, r:34, dmg:24 };
+  // Trùm chính hiện ra sau khi nhặt hộp của elite phút thứ 10 — nghĩa là người chơi bước vào
+  // trận này với đủ 5 nâng cấp cao cấp trong tay. Nó không triệu hồi gì cả: đánh tay đôi thật,
+  // vũ khí của nó là sóng xung kích lan ra và những cú lao húc.
+  var BOSS = { c:"#ff5347", dark:"#5e1414", hp:11000, speed:54, r:44, dmg:32,
+               waveMax:520, waveSpeed:330 };
+
+  // ---- the five upgrade groups an elite crate can raise
+  var GROUPS = [
+    { k:"power",  c:"#ff7a4e", fx:{ dmg:1, size:1 } },
+    { k:"spread", c:"#b07cff", fx:{ multi:1, rear:1, hex:1 } },
+    { k:"pen",    c:"#8ee64a", fx:{ pierce:1, bounce:1 } },
+    { k:"rof",    c:"#ffb340", fx:{ rate:1, mag:1 } },
+    { k:"surv",   c:"#4ec9e0", fx:{ hp:1, leech:1, speed:1, shield:1 } }
+  ];
+  var GCOLOR = {};
+  GROUPS.forEach(function(g){ Object.keys(g.fx).forEach(function(k){ if (!GCOLOR[k]) GCOLOR[k] = g.c; }); });
+  GCOLOR.rear = "#8ee64a";
+
+  // ================================================================ tune
+  var DEF = { timeScale:1, turnMul:1, frontArc:180, lead:1, density:1, pspeed:170, zspeed:1, flank:0.7,
+              xpCurve:1, theme:"farm", arenaR:560,
+              rearFire:true, showCone:true, sound:true, shake:true, god:false };
+  var T = {};
+  for (var dk in DEF) T[dk] = DEF[dk];
+  try {
+    var saved = JSON.parse(localStorage.getItem("zf_tune3") || "null");
+    if (saved) for (var sk in DEF) if (sk in saved) T[sk] = saved[sk];
+  } catch(e){}
+  function saveTune(){ try{ localStorage.setItem("zf_tune3", JSON.stringify(T)); }catch(e){} }
+
+  // ================================================================ setup
+  var $ = function(id){ return document.getElementById(id); };
+  var cv = $("game"), ctx = cv.getContext("2d");
+  var stage = $("stage");
+  if (("ontouchstart" in window) || navigator.maxTouchPoints > 0) $("touch").classList.add("on");
+
+  // Bản đồ vô tận: không còn biên nào cả. VIEW_H / VIEW_W_MIN chỉ nói người chơi nhìn thấy
+  // bao nhiêu thế giới một lúc, không phải thế giới rộng bao nhiêu. Lấy tỉ lệ nhỏ hơn để
+  // màn hình nào cũng thấy đủ 660 chiều cao VÀ 520 chiều ngang; màn dài hơn thì thấy rộng hơn.
+  var VIEW_H = 660, VIEW_W_MIN = 520;
+  var view = { scale:1, cw:0, ch:0, vw:VIEW_W_MIN, vh:VIEW_H, left:0, top:0 };
+  function resize(){
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var w = stage.clientWidth, h = stage.clientHeight;
+    if (!w || !h) return;
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    view.cw = w; view.ch = h;
+    view.scale = Math.min(h / VIEW_H, w / VIEW_W_MIN);
+    view.vw = w / view.scale; view.vh = h / view.scale;
+  }
+  // vòng sinh quái nằm ngay ngoài tầm nhìn, và bán kính thu hồi xa gấp đôi vòng đó
+  function spawnRadius(){ return Math.hypot(view.vw, view.vh) / 2 + 90; }
+  function cullRadius(){ return spawnRadius() * 2.1; }
+  window.addEventListener("resize", resize);
+
+  // ================================================================ state
+  var G = null;
+  var panelPaused = false;   // phân biệt "tạm dừng vì mở bảng Tune" với "tạm dừng bằng phím P"
+
+  function newGame(){
+    G = {
+      t:0, state:"play", kills:0, shots:0, hitshots:0, gold:0,
+      shake:0, flash:0, leechAcc:0,
+      lvl:1, xp:0, xpNext:xpForLevel(1),
+      adv:0, advByGroup:{}, eliteIdx:0, miniSpawned:false, mini:null, arena:null,
+      boss:null, bossSpawned:false, bossAfterPick:false, bossRef:null, bossKey:"",
+      unique:null,
+      target:null, rearLock:false,
+      pending:[], curPick:null,
+      up:{},
+      player:{ x:0, y:0, r:14, a:-Math.PI/2, hp:100, maxhp:100,
+               iframe:0, wi:0, spin:0, muzzle:0, stillT:0, shieldUp:false, shieldT:0, regenT:25,
+               moveA:null, anim:"idle", ft:0 },
+      guns: WEAPONS.map(function(w){ return { ammo:w.mag, reloadT:0, cool:0 }; }),
+      zombies:[], corpses:[], bullets:[], waves:[], parts:[], nums:[], orbs:[], items:[], crates:[], rings:[], markers:[],
+      spawnT:0
+    };
+    renderUpStack();
+    updateHUD();
+  }
+
+  function u(k){ return G.up[k] || 0; }
+
+  function uni(){ return G && G.unique ? UNIQUES[G.unique] : null; }
+
+  function wstat(i){
+    var w = WEAPONS[i], U = uni() || {};
+    var rate = w.rate / (1 + 0.22 * u("rate"));
+    if (U.fireMul) rate /= U.fireMul;
+    var dmg = w.dmg * (1 + 0.18 * u("dmg")) * (1 + 0.10 * u("size"));
+    if (U.dmgMul) dmg *= U.dmgMul;
+    var rad = 3 + 2.4 * u("size");
+    if (U.radMul) rad *= U.radMul;
+    if (U.radAdd) rad += U.radAdd;
+    var reload = w.reload * Math.pow(0.8, u("mag"));
+    if (U.reloadMul) reload *= U.reloadMul;
+    // Xuyên Phá lên nòng cố định và cực nhanh: bắn xong một viên là gần như bắn tiếp được ngay,
+    // nên nhịp bắn của khẩu súng mới là thứ giới hạn, không phải thời gian thay đạn.
+    if (U.reloadFixed) reload = U.reloadFixed;
+
+    var lines = 1 + u("multi") + (U.linesAdd || 0);
+    var pellets = w.pellets;
+    var pierce = w.pierce + u("pierce");
+    var mag = Math.round(w.mag * (1 + 0.5 * u("mag")));
+    var range = w.range;
+    var bounce = u("bounce");
+    var rebound = 0;
+    // Xuyên Phá: băng đạn khoá ở 1 viên, nhưng viên đó xuyên hết và bay hết bản đồ.
+    // Cả chùm đạn ghém dồn vào một viên duy nhất, nên Shotgun hoá thành đạn slug
+    // chứ không mất 7/8 sát thương. Nâng cấp Băng đạn vẫn có giá trị vì nó rút
+    // ngắn thời gian thay đạn — thứ chi phối hoàn toàn nhịp bắn khi băng chỉ 1 viên.
+    // Hai nâng cấp bị cơ chế này làm thừa được đổi sang tác dụng khác, nếu không
+    // người chơi sẽ nhặt phải những cấp hoàn toàn vô nghĩa:
+    //   Đạn xuyên  -> +10% sát thương mỗi cấp (vì đã xuyên sẵn mọi thứ)
+    //   Đạn nảy    -> hết tầm thì quay đầu bay ngược lại thêm 1 lượt mỗi cấp
+    //                 (bản đồ vô tận, không còn tường để dội)
+    if (U.oneShot){
+      dmg *= pellets;
+      dmg *= 1 + 0.10 * u("pierce");
+      mag = 1; pellets = 1; pierce = 9999;
+      rebound = bounce; bounce = 0;
+      range = 4000;
+    }
+
+    return { base:w, turn:w.turn * T.turnMul, arc:T.frontArc,
+             rate:rate, dmg:dmg, rad:rad, lines:lines, pellets:pellets,
+             rear:u("rear"), pierce:pierce, bounce:bounce, rebound:rebound,
+             steady:w.steady || 0, mag:mag, range:range, reload:reload };
+  }
+  // khiên: cấp 1 hồi 60 giây, mỗi cấp sau bớt 5 giây, sàn 25 giây
+  function shieldCd(){ return Math.max(25, 60 - 5 * (u("shield") - 1)); }
+
+  // ================================================================ input
+  var keys = {}, stick = { active:false, id:null, cx:0, cy:0, dx:0, dy:0 };
+  var pendingSwap = false;
+
+  window.addEventListener("keydown", function(e){
+    var c = e.code;
+    if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(c) >= 0) e.preventDefault();
+    if (keys[c]) return;
+    keys[c] = true;
+    if (c === "KeyQ" || c === "KeyE") pendingSwap = true;
+    if (c === "Digit1") setWeapon(0);
+    if (c === "Digit2") setWeapon(1);
+    if (c === "Digit3") setWeapon(2);
+    if (c === "Digit4") setWeapon(3);
+    if (c === "Digit5") setWeapon(4);
+    if (c === "KeyP" || c === "Escape") togglePause();
+  });
+  window.addEventListener("keyup", function(e){ keys[e.code] = false; });
+  window.addEventListener("blur", function(){ keys = {}; stick.active = false; $("stick").classList.remove("on"); });
+
+  function readKeys(){
+    var x = 0, y = 0;
+    if (keys.ArrowLeft || keys.KeyA) x -= 1;
+    if (keys.ArrowRight || keys.KeyD) x += 1;
+    if (keys.ArrowUp || keys.KeyW) y -= 1;
+    if (keys.ArrowDown || keys.KeyS) y += 1;
+    var l = Math.hypot(x, y);
+    return l > 0 ? { x:x/l, y:y/l, m:1 } : { x:0, y:0, m:0 };
+  }
+
+  var zone = $("stickzone"), stickEl = $("stick"), knobEl = $("knob");
+  function stickStart(e){
+    var t = e.changedTouches ? e.changedTouches[0] : e;
+    stick.active = true; stick.id = t.identifier != null ? t.identifier : "m";
+    var r = zone.getBoundingClientRect();
+    stick.cx = t.clientX - r.left; stick.cy = t.clientY - r.top;
+    stickEl.style.left = stick.cx + "px"; stickEl.style.top = stick.cy + "px";
+    stickEl.classList.add("on");
+    stick.dx = 0; stick.dy = 0; knobEl.style.transform = "translate(0,0)";
+    e.preventDefault();
+  }
+  function stickMove(e){
+    if (!stick.active) return;
+    var list = e.changedTouches ? e.changedTouches : [e], t = null;
+    for (var i = 0; i < list.length; i++) if ((list[i].identifier != null ? list[i].identifier : "m") === stick.id) t = list[i];
+    if (!t) return;
+    var r = zone.getBoundingClientRect();
+    var dx = (t.clientX - r.left) - stick.cx, dy = (t.clientY - r.top) - stick.cy;
+    var l = Math.hypot(dx, dy), max = 46;
+    if (l > max) { dx = dx / l * max; dy = dy / l * max; }
+    stick.dx = dx / max; stick.dy = dy / max;
+    knobEl.style.transform = "translate(" + dx + "px," + dy + "px)";
+    e.preventDefault();
+  }
+  function stickEnd(){
+    if (!stick.active) return;
+    stick.active = false; stick.dx = 0; stick.dy = 0;
+    stickEl.classList.remove("on"); knobEl.style.transform = "translate(0,0)";
+  }
+  zone.addEventListener("touchstart", stickStart, {passive:false});
+  zone.addEventListener("touchmove", stickMove, {passive:false});
+  zone.addEventListener("touchend", stickEnd);
+  zone.addEventListener("touchcancel", stickEnd);
+  zone.addEventListener("mousedown", stickStart);
+  window.addEventListener("mousemove", function(e){ if (stick.active && stick.id === "m") stickMove(e); });
+  window.addEventListener("mouseup", function(){ if (stick.id === "m") stickEnd(); });
+  $("btn-swap").addEventListener("click", function(){ pendingSwap = true; });
+
+  function readStick(){
+    var l = Math.hypot(stick.dx, stick.dy);
+    if (l < 0.22) return { x:0, y:0, m:0 };
+    return { x:stick.dx/l, y:stick.dy/l, m:Math.min(1, (l - 0.22) / 0.62) };
+  }
+  function setWeapon(i){
+    if (!G || i === G.player.wi || i >= WEAPONS.length) return;
+    G.player.wi = i; G.player.spin = 0;
+    syncWeaponUI();
+  }
+
+  // ================================================================ audio
+  var AC = null;
+  function actx(){
+    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){ AC = false; } }
+    if (AC && AC.state === "suspended") AC.resume();
+    return AC || null;
+  }
+  function blip(freq, dur, type, vol){
+    if (!T.sound) return;
+    var a = actx(); if (!a) return;
+    var o = a.createOscillator(), g = a.createGain();
+    o.type = type || "square"; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol || 0.05, a.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0008, a.currentTime + dur);
+    o.connect(g); g.connect(a.destination);
+    o.start(); o.stop(a.currentTime + dur + 0.02);
+  }
+  function noise(dur, vol, cut){
+    if (!T.sound) return;
+    var a = actx(); if (!a) return;
+    var n = Math.floor(a.sampleRate * dur);
+    var buf = a.createBuffer(1, n, a.sampleRate), d = buf.getChannelData(0);
+    for (var i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    var s = a.createBufferSource(); s.buffer = buf;
+    var g = a.createGain(); g.gain.value = vol || 0.06;
+    var f = a.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = cut || 1400;
+    s.connect(f); f.connect(g); g.connect(a.destination); s.start();
+  }
+
+  // ================================================================ helpers
+  function angDiff(a, b){
+    var d = (a - b) % (Math.PI * 2);
+    if (d > Math.PI) d -= Math.PI * 2;
+    if (d < -Math.PI) d += Math.PI * 2;
+    return d;
+  }
+  function rotToward(cur, tgt, maxStep){
+    var d = angDiff(tgt, cur);
+    return Math.abs(d) <= maxStep ? tgt : cur + Math.sign(d) * maxStep;
+  }
+  function rnd(a, b){ return a + Math.random() * (b - a); }
+  function fmtTime(s){ s = Math.max(0, Math.floor(s)); return Math.floor(s/60) + ":" + String(s%60).padStart(2,"0"); }
+  // tiếng Việt dùng dấu phẩy thập phân, tiếng Anh dùng dấu chấm
+  function dec(v, n){ var s = v.toFixed(n); return LANG === "vi" ? s.replace(".", ",") : s; }
+
+  function spark(x, y, n, color, spd, life){
+    if (G.parts.length > 420) return;
+    for (var i = 0; i < n; i++){
+      var a = Math.random() * Math.PI * 2, s = rnd(spd * 0.3, spd), lf = life || rnd(0.22, 0.5);
+      G.parts.push({ x:x, y:y, vx:Math.cos(a)*s, vy:Math.sin(a)*s, r:rnd(1.4,3.2), life:lf, max:lf, c:color });
+    }
+  }
+  function ring(x, y, max, color){ G.rings.push({ x:x, y:y, r:6, max:max, life:0.38, c:color }); }
+  function dmgNum(x, y, v, big){ if (G.nums.length < 70) G.nums.push({ x:x, y:y, v:Math.round(v), life:0.62, big:!!big }); }
+
+  // ================================================================ spawning
+  // Không còn cạnh bản đồ để sinh quái: quái hiện ra trên một vòng tròn vừa khuất tầm nhìn
+  // quanh người chơi, nên chạy về hướng nào cũng đâm vào quái mới.
+  // Không có tường thì chạy trốn mãi được, và bản đồ vô tận sẽ hoá vô hại. Nên hơn một nửa
+  // số quái sinh ra trong cung 140° phía trước hướng chạy: chạy thẳng là đâm vào đợt mới.
+  function spawnPos(){
+    var p = G.player, R = spawnRadius(), a;
+    if (p.moveA != null && Math.random() < 0.55) a = p.moveA + rnd(-1.22, 1.22);
+    else a = Math.random() * 6.283;
+    return { x:p.x + Math.cos(a) * R, y:p.y + Math.sin(a) * R };
+  }
+  function hpScale(){ return 1 + (G.t / LEVEL_TIME) * 2.1; }
+
+  function spawnZombie(x, y, type){
+    var d = ZTYPE[type];
+    G.zombies.push({ x:x, y:y, r:d.r, type:type, elite:null, kind:null,
+      hp:d.hp * hpScale(), maxhp:d.hp * hpScale(), speed:d.speed, dmg:d.dmg,
+      color:d.color, dark:d.dark, touch:d.touch, xp:d.xp,
+      hit:0, cd:0, vx:0, vy:0, face:0, dead:false, wob:Math.random()*6.28,
+      anim:"walk", ft:Math.random() * 2,
+      flanker: type === "runner" && Math.random() < T.flank });
+  }
+
+  // Trùm cuối kéo theo cả một nghi thức: dọn sạch sân, đếm ngược, rồi khép vòng vây đỏ lại.
+  // Vòng vây neo vào chỗ người chơi đang đứng nên không bao giờ sinh ra ở nơi họ không tới được.
+  function startArena(){
+    var p = G.player;
+    // Vòng vây bắt đầu ở ngoài rìa màn hình rồi siết dần vào trong suốt 3 giây đếm ngược.
+    // Nếu hiện ra sẵn ở bán kính cuối thì người chơi đứng giữa sẽ chẳng thấy bức tường đâu.
+    var from = Math.max(Math.max(view.vw, view.vh) * 1.25, T.arenaR * 1.5);
+    G.arena = { x:p.x, y:p.y, r:from, rFrom:from, rTo:T.arenaR, t:3.9, phase:"count", beep:4 };
+    for (var i = 0; i < G.zombies.length; i++){
+      var z = G.zombies[i];
+      // fromHex = true: cắt nổ lục giác, nếu không 80 cái xác cùng lúc sẽ đẻ ra 480 viên đạn
+      if (!z.dead && !z.elite && z.kind !== "mini") kill(z, true);
+    }
+    // Quái chết rải khắp bản đồ nên phần lớn kinh nghiệm và vàng rơi ngoài vòng vây, mà
+    // người chơi thì sắp bị nhốt vào trong. Kéo hết về, coi như một cú nam châm miễn phí.
+    G.orbs.forEach(function(o){ o.homing = true; });
+    G.items.forEach(function(it){ it.homing = true; });
+    G.flash = 1;
+    if (T.shake) G.shake = 14;
+    ring(p.x, p.y, T.arenaR, "rgba(255,70,60,.9)");
+    noise(0.9, 0.12, 380);
+    blip(70, 0.9, "sawtooth", 0.08);
+  }
+  function arenaSpawn(){
+    var A = G.arena, a = Math.random() * 6.283;
+    return { x:A.x + Math.cos(a) * A.r * 0.78, y:A.y + Math.sin(a) * A.r * 0.78 };
+  }
+
+  function spawnElite(idx){
+    var e = ELITES[Math.min(idx, ELITES.length - 1)];
+    var last = idx === ELITE_TIMES.length - 1;
+    var pos = spawnPos();
+    var hp = e.hp * (1 + (idx >= ELITES.length ? (idx - ELITES.length + 1) * 0.5 : 0));
+    G.zombies.push({ x:pos.x, y:pos.y, r:e.r, type:"elite", elite:e, kind:e.k, last:last,
+      hp:hp, maxhp:hp, speed:e.speed, dmg:e.dmg, color:e.c, dark:e.dark, touch:0.6, xp:26,
+      hit:0, cd:0, vx:0, vy:0, face:0, dead:false, wob:0, anim:"walk", ft:0,
+      timer: e.k === "charger" ? 2.0 : 3.0, phase:"walk", shield:false, flanker:false });
+    G.markers.push({ x:pos.x, y:pos.y, t:1.6, elite:true });
+    blip(90, 0.5, "sawtooth", 0.06);
+    noise(0.5, 0.08, 500);
+  }
+
+  function showBossBar(ent, key){
+    G.bossRef = ent; G.bossKey = key;
+    $("bossname").textContent = t(key);
+    $("bosswrap").hidden = false;
+  }
+
+  function spawnMini(){
+    if (G.miniSpawned) return;
+    G.miniSpawned = true;
+    startArena();
+    var pos = arenaSpawn();
+    var m = { x:pos.x, y:pos.y, r:MINI.r, type:"mini", elite:null, kind:"mini",
+      hp:MINI.hp, maxhp:MINI.hp, speed:MINI.speed, dmg:MINI.dmg,
+      color:MINI.c, dark:MINI.dark, touch:0.6, xp:0,
+      hit:0, cd:0, vx:0, vy:0, face:0, dead:false, wob:0, anim:"walk", ft:0,
+      timer:4, ctimer:7, phase:"walk", shield:false, flanker:false };
+    G.zombies.push(m);
+    G.mini = m;
+    G.markers.push({ x:pos.x, y:pos.y, t:1.8, elite:true });
+    showBossBar(m, "mini.name");
+    blip(64, 0.9, "sawtooth", 0.09);
+    noise(0.9, 0.11, 420);
+    if (T.shake) G.shake = 13;
+  }
+
+  // Trùm chính: gọi ra sau khi người chơi nhặt xong hộp của elite phút thứ 10.
+  function spawnBoss(){
+    if (G.bossSpawned) return;
+    G.bossSpawned = true;
+    startArena();
+    var pos = arenaSpawn();
+    var b = { x:pos.x, y:pos.y, r:BOSS.r, type:"boss", elite:null, kind:"boss",
+      hp:BOSS.hp, maxhp:BOSS.hp, speed:BOSS.speed, dmg:BOSS.dmg,
+      color:BOSS.c, dark:BOSS.dark, touch:0.55, xp:0,
+      hit:0, cd:0, vx:0, vy:0, face:0, dead:false, wob:0, anim:"walk", ft:0,
+      timer:5, ctimer:9, phase:"walk", shield:false, flanker:false };
+    G.zombies.push(b);
+    G.boss = b;
+    G.markers.push({ x:pos.x, y:pos.y, t:2.2, elite:true });
+    showBossBar(b, "boss.name");
+    blip(52, 1.2, "sawtooth", 0.1);
+    noise(1.2, 0.13, 360);
+    if (T.shake) G.shake = 16;
+  }
+
+  // Sóng xung kích: một vòng lan ra, chạm vào người chơi đúng lúc nó quét qua thì ăn đòn.
+  // Rẻ hơn hẳn việc dựng cả hệ đạn của quái, mà nhìn từ trên xuống lại rất rõ ràng.
+  function shockwave(z){
+    G.waves.push({ x:z.x, y:z.y, r:34, max:BOSS.waveMax, sp:BOSS.waveSpeed, hit:false, dmg:z.dmg });
+    ring(z.x, z.y, 44, "rgba(255,83,71,.95)");
+    blip(120, 0.3, "sawtooth", 0.06);
+    noise(0.3, 0.07, 300);
+    if (T.shake) G.shake = Math.min(13, G.shake + 7);
+  }
+
+  // ================================================================ targeting
+  function aimAt(z){
+    var p = G.player, w = WEAPONS[p.wi];
+    var dist = Math.hypot(z.x - p.x, z.y - p.y);
+    var tt = (dist / w.bspeed) * T.lead;
+    return Math.atan2((z.y + z.vy * tt) - p.y, (z.x + z.vx * tt) - p.x);
+  }
+  function pickTarget(arcDeg){
+    var p = G.player, zs = G.zombies;
+    var half = (Math.min(360, arcDeg) / 2) * Math.PI / 180;
+    var best = null, bestD = Infinity, z, d;
+    for (var i = 0; i < zs.length; i++){
+      z = zs[i]; if (z.dead) continue;
+      if (Math.abs(angDiff(Math.atan2(z.y - p.y, z.x - p.x), p.a)) > half) continue;
+      d = Math.hypot(z.x - p.x, z.y - p.y);
+      if (d < bestD){ bestD = d; best = z; }
+    }
+    if (!best && T.rearFire){
+      for (var j = 0; j < zs.length; j++){
+        z = zs[j]; if (z.dead) continue;
+        d = Math.hypot(z.x - p.x, z.y - p.y);
+        if (d < bestD){ bestD = d; best = z; }
+      }
+    }
+    var cur = G.target;
+    if (best && cur && !cur.dead && cur !== best){
+      var cd = Math.hypot(cur.x - p.x, cur.y - p.y);
+      if (Math.abs(angDiff(Math.atan2(cur.y - p.y, cur.x - p.x), p.a)) <= half && cd < bestD * 1.35) best = cur;
+    }
+    G.target = best;
+    G.rearLock = best ? Math.abs(angDiff(Math.atan2(best.y - p.y, best.x - p.x), p.a)) > half : false;
+    return best;
+  }
+
+  // ================================================================ combat
+  function fire(){
+    var p = G.player, ws = wstat(p.wi), w = ws.base, g = G.guns[p.wi];
+    var ox = p.x + Math.cos(p.a) * (p.r + 3), oy = p.y + Math.sin(p.a) * (p.r + 3);
+    var n = ws.pellets, lines = ws.lines, fan = 9 * Math.PI / 180;
+    var steady = (ws.steady && p.stillT >= STEADY_AFTER) ? ws.steady : 1;
+    for (var L = 0; L < lines; L++){
+      var lineA = p.a + (L - (lines - 1) / 2) * fan;
+      for (var i = 0; i < n; i++){
+        var sp = (w.spread * Math.PI / 180) * (n > 1 ? (i / (n - 1) - 0.5) * 2 : rnd(-0.5, 0.5));
+        shoot(ox, oy, lineA + sp, ws, steady);
+      }
+    }
+    for (var R = 0; R < ws.rear; R++)
+      shoot(p.x - Math.cos(p.a) * p.r, p.y - Math.sin(p.a) * p.r,
+            p.a + Math.PI + (R - (ws.rear - 1) / 2) * fan, ws, steady);
+    if (steady > 1) ring(p.x, p.y, p.r + 16, "rgba(207,232,255,.9)");
+
+    g.ammo--; p.muzzle = 0.055;
+    if (T.shake) G.shake = Math.min(11, G.shake + w.shake);
+    if (w.id === "shotgun") { noise(0.16, 0.1); blip(90, 0.09, "sawtooth", 0.05); }
+    else if (w.id === "rifle") { blip(320, 0.05, "square", 0.035); noise(0.05, 0.035); }
+    else if (w.id === "minigun") { blip(180 + Math.random() * 40, 0.03, "square", 0.022); }
+    else { blip(430 + Math.random() * 60, 0.028, "square", 0.022); }
+    if (g.ammo <= 0) { g.reloadT = ws.reload; blip(140, 0.08, "triangle", 0.03); }
+  }
+  function shoot(x, y, a, ws, mul){
+    if (G.bullets.length > 460) return;
+    G.shots++;   // đếm theo từng viên, khớp với cách đếm trúng, nếu không độ chính xác sẽ vượt 100%
+    G.bullets.push({ x:x, y:y, vx:Math.cos(a)*ws.base.bspeed, vy:Math.sin(a)*ws.base.bspeed,
+      dmg:ws.dmg * (mul || 1), left:ws.range, range:ws.range, pierce:ws.pierce, pierceLeft:ws.pierce,
+      bounce:ws.bounce, rebound:ws.rebound || 0,
+      rad:ws.rad, kb:ws.base.kb, c:ws.base.color, trail:ws.base.trail,
+      hits:[], counted:false });
+  }
+  function bounceTo(b, from){
+    var zs = G.zombies, best = null, bd = 170;
+    for (var i = 0; i < zs.length; i++){
+      var z = zs[i];
+      if (z.dead || b.hits.indexOf(z) >= 0) continue;
+      var d = Math.hypot(z.x - from.x, z.y - from.y);
+      if (d < bd){ bd = d; best = z; }
+    }
+    if (!best) return false;
+    var a = Math.atan2(best.y - from.y, best.x - from.x), sp = Math.hypot(b.vx, b.vy);
+    b.x = from.x; b.y = from.y;
+    b.vx = Math.cos(a) * sp; b.vy = Math.sin(a) * sp;
+    b.left = bd + 40; b.dmg *= 0.85;
+    spark(from.x, from.y, 3, "rgba(255,226,138,.95)", 90, 0.25);
+    blip(880, 0.03, "triangle", 0.018);
+    return true;
+  }
+
+  // armour / shield are resolved here so every damage source obeys them
+  function hurt(z, dmg, travelAngle, fromHex){
+    if (z.dead) return;
+    if (z.kind === "shield" && z.shield){
+      spark(z.x, z.y, 2, "rgba(120,220,245,.9)", 70, 0.22);
+      return;
+    }
+    if (z.kind === "armor" && travelAngle != null){
+      // bullet flying against the plate takes the hit; from behind it goes straight through
+      if (Math.abs(angDiff(travelAngle, z.face)) > Math.PI / 2){
+        dmg *= 0.25;
+        spark(z.x, z.y, 2, "rgba(210,225,235,.9)", 60, 0.2);
+      }
+    }
+    z.hp -= dmg; z.hit = 1;
+    dmgNum(z.x, z.y - z.r, dmg, !!z.elite);
+    if (u("leech") > 0){
+      G.leechAcc += dmg;
+      var per = 25 / u("leech");
+      while (G.leechAcc >= per && G.player.hp < G.player.maxhp){
+        G.leechAcc -= per;
+        G.player.hp = Math.min(G.player.maxhp, G.player.hp + 1);
+      }
+      // đầy máu thì không được tích luỹ: nếu không, sát thương gây ra khi full máu
+      // sẽ thành một kho hồi máu khổng lồ, hồi đầy tức thì ngay khi vừa bị đánh
+      if (G.leechAcc > per) G.leechAcc = per;
+    }
+    if (z.hp <= 0) kill(z, fromHex);
+  }
+
+  function kill(z, fromHex){
+    if (z.dead) return;
+    z.dead = true;
+    G.kills++;
+    if (G.target === z) G.target = null;
+    // Bộ da nào có hoạt cảnh chết thì để lại cái xác chạy cho hết; hôm nay chưa bộ nào có
+    // nên nhánh này không chạy và zombie vẫn tan thành hạt như cũ.
+    if (sprite(SKIN[z.kind || z.type]) && ANIM.die && G.corpses.length < 60){
+      var dur = ANIM.die.n / ANIM.die.fps;
+      G.corpses.push({ x:z.x, y:z.y, r:z.r, face:z.face, kind:z.kind || z.type,
+                       corpse:true, anim:"die", ft:0, life:dur, max:dur });
+    }
+    var big = !!z.elite || z.kind === "mini";
+    spark(z.x, z.y, big ? 26 : 13, "rgba(150,40,40,.9)", big ? 260 : 190, 0.55);
+    spark(z.x, z.y, 6, z.color, 120, 0.4);
+    blip(big ? 90 : 150, big ? 0.25 : 0.1, "sawtooth", 0.035);
+
+    if (z.kind === "boss"){
+      G.boss = null; G.bossRef = null; G.arena = null;
+      G.waves.length = 0;
+      $("bosswrap").hidden = true;
+      if (T.shake) G.shake = 20;
+      spark(z.x, z.y, 40, "rgba(255,120,90,.95)", 320, 0.8);
+      ring(z.x, z.y, 120, "rgba(255,83,71,.95)");
+      // Cộng thẳng vào ví chứ không rơi xuống đất: win() chạy ngay dòng dưới, đồng vàng nằm
+      // dưới đất sẽ không bao giờ nhặt được và bảng tổng kết cũng không tính nó.
+      G.gold += 400;
+      win();
+      return;
+    }
+
+    if (z.kind === "mini"){
+      G.mini = null; G.bossRef = null; G.arena = null;
+      $("bosswrap").hidden = true;
+      if (T.shake) G.shake = 15;
+      dropOrbs(z.x, z.y, 64);
+      addItem(z.x, z.y, "gold", 130);
+      addItem(z.x + 30, z.y + rnd(-12, 12), "hp", 0);
+      G.crates.push({ x:z.x, y:z.y, t:0, unique:true });
+      return;
+    }
+
+    if (z.elite){
+      G.crates.push({ x:z.x, y:z.y, t:0, last:!!z.last });
+      if (z.last) G.arena = null;        // hạ trùm cuối là vòng vây tan
+
+      if (T.shake) G.shake = 10;
+      if (z.kind === "splitter")
+        for (var s = 0; s < 4; s++)
+          spawnZombie(z.x + rnd(-26, 26), z.y + rnd(-26, 26), "runner");
+    }
+    if (z.xp > 0) dropOrbs(z.x, z.y, z.xp);
+    dropLoot(z);
+
+    // nổ lục giác: xác bắn ra 6 tia đều nhau. Tia của tia không nổ tiếp, nếu không
+    // một đám đông sẽ sinh ra hàng nghìn viên đạn trong một khung hình.
+    var hx = u("hex");
+    if (hx > 0 && !fromHex){
+      var hdmg = 12 + 11 * hx, hrange = 150 + 28 * hx, off = Math.random() * Math.PI;
+      for (var a6 = 0; a6 < 6; a6++){
+        var ang = off + (a6 / 6) * Math.PI * 2;
+        G.bullets.push({ x:z.x, y:z.y, vx:Math.cos(ang) * 560, vy:Math.sin(ang) * 560,
+          dmg:hdmg, left:hrange, pierce:1, pierceLeft:1, bounce:0, rad:4.4, kb:16,
+          c:"#c79bff", trail:8, hits:[], counted:true, hex:true });
+      }
+      ring(z.x, z.y, 28, "rgba(176,124,255,.85)");
+      blip(560, 0.05, "square", 0.024);
+    }
+  }
+
+  // Bản đồ vô tận nên ngọc rơi lại phía sau không bao giờ tự mất. Chạm trần thì thu hồi viên
+  // xa nhất và dồn giá trị của nó vào chỗ vừa rơi: không mất kinh nghiệm, mà cũng không để
+  // nó nằm lại chỗ người chơi chẳng bao giờ quay lại.
+  var ORB_CAP = 420, GOLD_CAP = 90;
+  function farthestOf(arr, kind){
+    var p = G.player, best = null, bd = -1;
+    for (var i = 0; i < arr.length; i++){
+      var e = arr[i];
+      if (kind && e.kind !== kind) continue;
+      var d = (e.x - p.x) * (e.x - p.x) + (e.y - p.y) * (e.y - p.y);
+      if (d > bd){ bd = d; best = e; }
+    }
+    return best;
+  }
+
+  function dropOrbs(x, y, amount){
+    var n = Math.min(5, 1 + Math.floor(amount / 6));
+    while (G.orbs.length + n > ORB_CAP){
+      var far = farthestOf(G.orbs);
+      if (!far) break;
+      amount += far.v;
+      G.orbs.splice(G.orbs.indexOf(far), 1);
+    }
+    for (var i = 0; i < n; i++)
+      G.orbs.push({ x:x + rnd(-10,10), y:y + rnd(-10,10), v:amount / n,
+                    vx:rnd(-40,40), vy:rnd(-40,40), homing:false, sp:0 });
+  }
+
+  function addItem(x, y, kind, v){
+    if (G.items.length > GOLD_CAP){
+      // vàng cũng vậy: thu hồi đồng xa nhất rồi gộp vào đồng mới, thay vì đánh rơi mất
+      var fg = kind === "gold" ? farthestOf(G.items, "gold") : null;
+      if (!fg) return;
+      v += fg.v;
+      G.items.splice(G.items.indexOf(fg), 1);
+    }
+    G.items.push({ x:x, y:y, kind:kind, v:v, t:0, vx:rnd(-50,50), vy:rnd(-50,50), homing:false, sp:0 });
+  }
+  // vàng là tiền meta mang về sảnh; máu và nam châm là vật phẩm dùng ngay trong màn
+  function dropLoot(z){
+    if (z.kind === "mini") return;
+    if (z.elite){
+      addItem(z.x, z.y, "gold", Math.round(rnd(26, 42)));
+      addItem(z.x + 28, z.y + rnd(-10, 10), "hp", 0);
+      return;
+    }
+    var r = Math.random();
+    if (r < 0.14) addItem(z.x, z.y, "gold", 1 + Math.floor(Math.random() * 3));
+    else if (r < 0.145) addItem(z.x, z.y, "hp", 0);        // 0,50%
+    else if (r < 0.155) addItem(z.x, z.y, "magnet", 0);    // 1,00%
+  }
+
+  // ================================================================ upgrades
+  function addFx(k, n){
+    var cur = u(k), max = FX[k].max || 99;
+    var next = Math.min(max, cur + n);
+    if (next === cur) return false;
+    G.up[k] = next;
+    if (k === "hp"){
+      var add = 30 * (next - cur);
+      G.player.maxhp += add;
+      G.player.hp = Math.min(G.player.maxhp, G.player.hp + add);
+    }
+    if (k === "mag") G.guns.forEach(function(g, i){ g.ammo = Math.max(g.ammo, wstat(i).mag); });
+    if (k === "shield" && cur === 0){ G.player.shieldUp = true; G.player.shieldT = 0; }
+    return true;
+  }
+  function fxAtMax(k){ return u(k) >= (FX[k].max || 99); }
+  // Xuyên Phá đổi công dụng của hai nâng cấp, nên thẻ chọn phải nói đúng thứ sẽ nhận được
+  function fxName(k){ return t("fx." + k + ".n"); }
+  function fxDesc(k){
+    var U = uni();
+    if (U && U.oneShot && (k === "pierce" || k === "bounce")) return t("fx." + k + ".rail");
+    return t("fx." + k + ".d");
+  }
+
+  function queuePick(type){
+    G.pending.push(type);
+    if (G.state === "play") openNextPick();
+  }
+  function openNextPick(){
+    if (!G.pending.length){
+      G.curPick = null;
+      G.state = "play";
+      $("ov-pick").classList.remove("on");
+      return;
+    }
+    var type = G.pending.shift();
+    if (type === "unique" && G.unique) type = "crate";   // chỉ một nâng cấp độc nhất mỗi lượt
+    G.state = "pick";
+
+    if (type === "unique"){
+      G.curPick = { type:"unique", opts:Object.keys(UNIQUES) };
+    } else if (type === "crate"){
+      // nhóm nào mọi hiệu ứng đã kịch cấp 5 thì không còn xuất hiện nữa
+      var pool = GROUPS.filter(function(g){
+        return Object.keys(g.fx).some(function(k){ return !fxAtMax(k); });
+      });
+      if (!pool.length){ G.adv++; G.gold += 150; afterPick(); return; }
+      var picks = [];
+      for (var i = 0; i < 3 && pool.length; i++)
+        picks.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0].k);
+      G.curPick = { type:"crate", opts:picks, adv:G.adv };
+    } else {
+      var keys = Object.keys(FX).filter(function(k){ return !fxAtMax(k); });
+      var opts = [];
+      for (var j = 0; j < 3 && keys.length; j++)
+        opts.push(keys.splice(Math.floor(Math.random() * keys.length), 1)[0]);
+      if (!opts.length){ G.gold += 40; afterPick(); return; }
+      G.curPick = { type:"level", opts:opts, lvl:G.lvl };
+    }
+    renderPick();
+    $("ov-pick").classList.add("on");
+  }
+
+  // Chọn xong một thẻ là menu dựng lại ngay tại chỗ. Bấm đúp nhanh thì cú thứ hai rơi trúng
+  // thẻ mới vừa hiện ra, ăn mất một lượt nâng cấp mà người chơi chưa kịp đọc. Khoá 260ms.
+  var pickReadyAt = 0;
+  function pickLocked(){ return Date.now() < pickReadyAt; }
+
+  // tách riêng khỏi openNextPick để đổi ngôn ngữ giữa chừng vẫn vẽ lại đúng ba lựa chọn đang mở
+  function renderPick(){
+    var P = G.curPick;
+    if (!P) return;
+    pickReadyAt = Date.now() + 220;
+    var list = $("pick-list");
+    list.innerHTML = "";
+    if (P.type === "unique"){
+      $("pick-kicker").textContent = t("pick.uniKicker");
+      $("pick-title").textContent = t("pick.uniTitle");
+      $("pick-note").textContent = t("pick.uniNote");
+      P.opts.forEach(function(k){ list.appendChild(uniqueCard(k)); });
+    } else if (P.type === "crate"){
+      $("pick-kicker").textContent = t("pick.crateKicker", { a:P.adv + 1, b:ADV_TOTAL });
+      $("pick-title").textContent = t("pick.crateTitle");
+      $("pick-note").textContent = t("pick.crateNote");
+      P.opts.forEach(function(gk){
+        GROUPS.forEach(function(g){ if (g.k === gk) list.appendChild(groupCard(g)); });
+      });
+    } else {
+      $("pick-kicker").textContent = t("pick.lvlKicker", { n:P.lvl });
+      $("pick-title").textContent = t("pick.lvlTitle");
+      $("pick-note").textContent = t("pick.lvlNote");
+      P.opts.forEach(function(k){ list.appendChild(fxCard(k)); });
+    }
+  }
+
+  function fxCard(k){
+    var el = document.createElement("button");
+    el.type = "button";
+    el.style.borderTopColor = GCOLOR[k] || "#8ee64a";
+    var n = document.createElement("span"); n.className = "pname";
+    n.style.color = GCOLOR[k] || "#8ee64a"; n.textContent = fxName(k);
+    var d = document.createElement("span"); d.className = "pdesc"; d.textContent = fxDesc(k);
+    var l = document.createElement("span"); l.className = "plvl";
+    l.textContent = t("pick.rank", { a:u(k), b:u(k) + 1 });
+    el.appendChild(n); el.appendChild(d); el.appendChild(l);
+    el.addEventListener("click", function(){
+      if (pickLocked()) return;
+      addFx(k, 1);
+      afterPick();
+    });
+    return el;
+  }
+
+  function groupCard(g){
+    var el = document.createElement("button");
+    el.type = "button";
+    el.style.borderTopColor = g.c;
+    var n = document.createElement("span"); n.className = "pname"; n.style.color = g.c;
+    n.textContent = t("grp." + g.k + ".n");
+    var d = document.createElement("span"); d.className = "pdesc";
+    d.textContent = t("grp." + g.k + ".note");
+    var box = document.createElement("div"); box.className = "fxlist";
+    Object.keys(g.fx).forEach(function(k){
+      var row = document.createElement("span");
+      var label = document.createElement("b");
+      label.style.fontWeight = "500";
+      label.textContent = fxName(k);
+      var val = document.createElement("i");
+      val.textContent = fxAtMax(k) ? t("pick.max")
+        : u(k) + " → " + Math.min(FX[k].max || 99, u(k) + g.fx[k]);
+      row.appendChild(label); row.appendChild(val);
+      box.appendChild(row);
+    });
+    el.appendChild(n); el.appendChild(d); el.appendChild(box);
+    el.addEventListener("click", function(){
+      if (pickLocked()) return;
+      Object.keys(g.fx).forEach(function(k){ addFx(k, g.fx[k]); });
+      G.adv++;
+      G.advByGroup[g.k] = (G.advByGroup[g.k] || 0) + 1;
+      afterPick();
+    });
+    return el;
+  }
+
+  function uniqueCard(k){
+    var U = UNIQUES[k];
+    var el = document.createElement("button");
+    el.type = "button";
+    el.style.borderTopColor = U.c;
+    var n = document.createElement("span"); n.className = "pname"; n.style.color = U.c;
+    n.textContent = t("uni." + k + ".n");
+    var d = document.createElement("span"); d.className = "pdesc"; d.textContent = t("uni." + k + ".d");
+    var box = document.createElement("div"); box.className = "fxlist";
+    tList("uni." + k + ".list").forEach(function(line){
+      var row = document.createElement("span");
+      var b = document.createElement("b"); b.style.fontWeight = "500"; b.textContent = line;
+      row.appendChild(b);
+      box.appendChild(row);
+    });
+    el.appendChild(n); el.appendChild(d); el.appendChild(box);
+    el.addEventListener("click", function(){
+      if (pickLocked()) return;
+      applyUnique(k); afterPick();
+    });
+    return el;
+  }
+
+  function applyUnique(k){
+    if (G.unique) return;   // maxhp và cỡ người là thay đổi vĩnh viễn, không được cộng dồn hai lần
+    var U = UNIQUES[k], p = G.player;
+    G.unique = k;
+    if (U.hpMul){
+      p.maxhp = Math.round(p.maxhp * U.hpMul);
+      p.hp = p.maxhp;
+    }
+    if (U.bodyScale){ p.r = Math.round(14 * U.bodyScale); p.regenT = U.regen || 25; }
+    if (U.oneShot) G.guns.forEach(function(g, i){ g.ammo = Math.min(g.ammo, wstat(i).mag); });
+    ring(p.x, p.y, 70, U.c);
+    blip(420, 0.2, "triangle", 0.06);
+    blip(660, 0.26, "triangle", 0.05);
+  }
+
+  function afterPick(){
+    renderUpStack();
+    updateHUD();
+    blip(700, 0.1, "triangle", 0.05);
+    // Nhặt xong hộp của elite phút thứ 10 là trùm chính bước ra. Phải đợi chọn hết hàng chờ
+    // đã, nếu không nghi thức vòng vây sẽ chạy phía sau một cái menu đang mở.
+    if (!G.pending.length && G.bossAfterPick){
+      G.bossAfterPick = false;
+      G.state = "play";
+      $("ov-pick").classList.remove("on");
+      spawnBoss();
+      return;
+    }
+    openNextPick();
+  }
+
+  function renderUpStack(){
+    var host = $("upstack");
+    host.innerHTML = "";
+    if (G.unique){
+      var uEl = document.createElement("div");
+      uEl.className = "uptag";
+      uEl.style.color = UNIQUES[G.unique].c;
+      uEl.style.borderWidth = "2px";
+      uEl.textContent = "★ " + t("uni." + G.unique + ".n");
+      host.appendChild(uEl);
+    }
+    Object.keys(G.up).forEach(function(k){
+      if (!G.up[k]) return;
+      var el = document.createElement("div");
+      el.className = "uptag";
+      el.style.color = GCOLOR[k] || "#8ee64a";
+      el.textContent = fxName(k) + " " + G.up[k];
+      host.appendChild(el);
+    });
+  }
+
+  // Đường cong kinh nghiệm. Trước đây là tuyến tính (15, 24, 33, 42…), mỗi cấp chỉ đắt thêm
+  // đúng 9 điểm — trong khi thu nhập kinh nghiệm thì tăng theo cấp số nhân, vì càng nâng cấp
+  // càng giết nhanh. Hậu quả: 55 cấp trong một ván 10 phút, gần như nâng hết mọi thứ lên cấp 5
+  // và những lần chọn cuối chẳng còn gì đáng chọn. Giờ thêm số hạng bậc hai nên cấp càng cao
+  // càng đắt nhanh: 14, 26, 41, 60, 82… tới cấp 20 là 782 (trước chỉ 186).
+  function xpForLevel(lvl){
+    var k = lvl - 1;
+    return Math.max(10, Math.round(14 + (10 * k + 1.6 * k * k) * T.xpCurve));
+  }
+  function gainXp(v){
+    G.xp += v;
+    while (G.xp >= G.xpNext){
+      G.xp -= G.xpNext;
+      G.lvl++;
+      G.xpNext = xpForLevel(G.lvl);
+      queuePick("level");
+    }
+  }
+
+  // ================================================================ update
+  function clampToArena(e, rad){
+    var A = G.arena, dx = e.x - A.x, dy = e.y - A.y;
+    var d = Math.hypot(dx, dy), lim = A.r - rad;
+    if (d > lim && d > 0){ e.x = A.x + dx / d * lim; e.y = A.y + dy / d * lim; }
+  }
+
+  // Một cửa duy nhất để người chơi ăn đòn, dùng chung cho va chạm quái và sóng xung kích của
+  // trùm chính. Trả về true nếu cú này giết người chơi, nơi gọi phải thoát khỏi update ngay.
+  function hitPlayer(dmg){
+    var p = G.player;
+    if (p.iframe > 0 || T.god) return false;
+    if (p.shieldUp){
+      p.shieldUp = false; p.shieldT = shieldCd(); p.iframe = 0.6;
+      ring(p.x, p.y, 48, "rgba(176,124,255,.95)");
+      spark(p.x, p.y, 12, "rgba(200,160,255,.9)", 170, 0.42);
+      blip(300, 0.16, "triangle", 0.06);
+      if (T.shake) G.shake = Math.min(12, G.shake + 4);
+      return false;
+    }
+    p.hp -= dmg;
+    p.iframe = 0.32; G.flash = 1;
+    if (T.shake) G.shake = Math.min(15, G.shake + 5);
+    noise(0.12, 0.09);
+    spark(p.x, p.y, 7, "rgba(255,83,71,.9)", 130);
+    if (p.hp <= 0){ p.hp = 0; die(); return true; }
+    return false;
+  }
+
+  function update(dt){
+    var p = G.player;
+    G.t += dt;
+
+    // ---- đếm ngược vào trận trùm cuối
+    if (G.arena && G.arena.phase === "count"){
+      var A = G.arena;
+      A.t -= dt;
+      var k = Math.max(0, Math.min(1, 1 - A.t / 3.9));
+      A.r = A.rFrom + (A.rTo - A.rFrom) * (k * k * (3 - 2 * k));
+      var step = Math.ceil(A.t - 0.9);
+      if (step < A.beep){
+        A.beep = step;
+        blip(step > 0 ? 440 : 760, step > 0 ? 0.12 : 0.4, "square", 0.05);
+      }
+      if (A.t <= 0){ A.phase = "fight"; A.r = A.rTo; }
+    }
+
+    var kin = readKeys(), tin = readStick();
+    var inp = tin.m > 0 ? tin : kin;
+    var ws = wstat(p.wi);
+
+    // ---- aim
+    var tgt = pickTarget(ws.arc);
+    var desired = tgt ? aimAt(tgt) : (inp.m > 0 ? Math.atan2(inp.y, inp.x) : p.a);
+    p.a = rotToward(p.a, desired, (ws.turn * Math.PI / 180) * dt);
+
+    // ---- shield recharge
+    if (u("shield") > 0 && !p.shieldUp){
+      p.shieldT -= dt;
+      if (p.shieldT <= 0){
+        p.shieldUp = true;
+        ring(p.x, p.y, 34, "rgba(176,124,255,.9)");
+        blip(700, 0.12, "sine", 0.04);
+      }
+    }
+    // ---- Khổng Lồ tự liền da
+    if (G.unique === "tank"){
+      p.regenT -= dt;
+      if (p.regenT <= 0){
+        p.regenT = UNIQUES.tank.regen;
+        var rh = Math.round(p.maxhp * 0.15);
+        if (p.hp < p.maxhp){
+          p.hp = Math.min(p.maxhp, p.hp + rh);
+          dmgNum(p.x, p.y - p.r - 12, rh, true);
+          ring(p.x, p.y, 38, "rgba(142,230,74,.8)");
+          blip(640, 0.12, "sine", 0.04);
+        }
+      }
+    }
+    if (pendingSwap){ setWeapon((p.wi + 1) % WEAPONS.length); pendingSwap = false; }
+
+    // ---- movement
+    var spd = T.pspeed * (1 + 0.14 * u("speed"));
+    var mx = 0, my = 0;
+    if (inp.m > 0){
+      mx = inp.x * spd * inp.m; my = inp.y * spd * inp.m;
+      p.moveA = Math.atan2(inp.y, inp.x);   // hướng chạy quyết định phần lớn quái sinh ra ở đâu
+    }
+    p.x += mx * dt; p.y += my * dt;   // vô tận: không kẹp biên nữa
+    if (G.arena) clampToArena(p, p.r);
+    p.ft += dt;
+    p.anim = inp.m > 0 ? "walk" : "idle";
+    p.stillT = inp.m > 0 ? 0 : p.stillT + dt;
+    p.iframe = Math.max(0, p.iframe - dt);
+    if (p.muzzle) p.muzzle = Math.max(0, p.muzzle - dt);
+
+    // ---- auto fire
+    var g = G.guns[p.wi];
+    if (g.reloadT > 0){
+      g.reloadT -= dt; p.spin = 0;
+      if (g.reloadT <= 0){ g.ammo = ws.mag; blip(520, 0.07, "triangle", 0.04); }
+    } else {
+      p.spin = WEAPONS[p.wi].spin > 0 ? Math.min(1, p.spin + dt / WEAPONS[p.wi].spin) : 1;
+      g.cool -= dt;
+      if (g.cool <= 0){ fire(); g.cool = ws.rate / (0.45 + 0.55 * p.spin); }
+    }
+
+    // ---- schedule: trickle spawns + elites on the clock
+    var alive = G.zombies.length;
+    var cap = Math.round((52 + (G.t / LEVEL_TIME) * 58) * T.density);
+    G.spawnT -= dt;
+    if (G.spawnT <= 0){
+      G.spawnT = Math.max(0.24, 1.15 - (G.t / LEVEL_TIME) * 0.85) / Math.max(0.4, T.density);
+      // trong vòng vây trùm cuối thì ngừng nhỏ giọt: đó là một trận tay đôi, không phải đám đông
+      if (alive < cap && !G.arena){
+        // Vòng sinh nằm ngoài tầm nhìn nên quái đi bộ mất gần gấp đôi thời gian mới tới nơi
+        // so với hồi sinh ở rìa sân cũ. Đẻ theo chỗ trống còn lại thay vì theo đồng hồ, để
+        // "Mật độ zombie" lại đúng là thứ quyết định đám đông đông tới đâu.
+        var batch = Math.max(1, Math.min(9, Math.ceil((cap - alive) * 0.09)));
+        var runnerRatio = 0.16 + (G.t / LEVEL_TIME) * 0.46;
+        var pos = spawnPos();
+        for (var s = 0; s < batch; s++)
+          spawnZombie(pos.x + rnd(-24, 24), pos.y + rnd(-24, 24),
+                      Math.random() < runnerRatio ? "runner" : "walker");
+      }
+    }
+    while (G.eliteIdx < ELITE_TIMES.length && G.t >= ELITE_TIMES[G.eliteIdx]){
+      spawnElite(G.eliteIdx); G.eliteIdx++;
+    }
+    if (!G.miniSpawned && G.t >= MINI_TIME) spawnMini();
+
+    // ---- markers
+    for (var mi = G.markers.length - 1; mi >= 0; mi--){
+      G.markers[mi].t -= dt;
+      if (G.markers[mi].t <= 0) G.markers.splice(mi, 1);
+    }
+
+    // ---- zombies
+    var zs = G.zombies;
+    for (var i = 0; i < zs.length; i++){
+      var z = zs[i];
+      if (z.dead) continue;
+      z.hit = Math.max(0, z.hit - dt * 4);
+      z.cd = Math.max(0, z.cd - dt);
+      z.wob += dt * 9;
+      z.ft += dt;
+
+      var dx = p.x - z.x, dy = p.y - z.y, d = Math.hypot(dx, dy) || 1;
+      var toPlayer = Math.atan2(dy, dx);
+      var sp = z.speed * T.zspeed, moveA = toPlayer;
+
+      if (z.elite || z.kind === "mini" || z.kind === "boss"){
+        var turnRate = ((z.elite ? z.elite.turn : 130) * Math.PI / 180) * dt;
+        z.face = rotToward(z.face, toPlayer, turnRate);
+        moveA = z.face;
+        z.timer -= dt;
+
+        if (z.kind === "summoner" && z.timer <= 0){
+          z.timer = 3;
+          for (var q = 0; q < 3; q++)
+            spawnZombie(z.x + rnd(-40, 40), z.y + rnd(-40, 40), "walker");
+          ring(z.x, z.y, 60, "rgba(194,133,230,.8)");
+        }
+        if (z.kind === "charger"){
+          if (z.phase === "walk"){ if (z.timer <= 0){ z.phase = "wind"; z.timer = 0.8; } }
+          else if (z.phase === "wind"){
+            sp = 0;
+            if (z.timer <= 0){ z.phase = "charge"; z.timer = 0.9; z.cdir = z.face; blip(200, 0.18, "sawtooth", 0.05); }
+          } else { sp = 430; moveA = z.cdir; if (z.timer <= 0){ z.phase = "walk"; z.timer = 2.0; } }
+        }
+        if (z.kind === "shield" && z.timer <= 0){
+          z.shield = !z.shield; z.timer = z.shield ? 2 : 3;
+          blip(z.shield ? 440 : 300, 0.1, "sine", 0.03);
+        }
+        if (z.kind === "mini"){
+          var frac = z.hp / z.maxhp;
+          sp = MINI.speed + (1 - frac) * 26;
+          if (z.timer <= 0){
+            z.timer = frac > 0.5 ? 5 : 3.6;
+            var count = frac > 0.5 ? 4 : 6;
+            for (var bq = 0; bq < count; bq++)
+              spawnZombie(z.x + rnd(-58, 58), z.y + rnd(-58, 58), frac > 0.5 ? "walker" : "runner");
+            ring(z.x, z.y, 84, "rgba(212,86,111,.8)");
+          }
+          // dưới nửa máu nó bắt đầu lao húc giữa các đợt triệu hồi
+          if (frac <= 0.5){
+            z.ctimer -= dt;
+            if (z.phase === "walk"){
+              if (z.ctimer <= 0){ z.phase = "wind"; z.ctimer = 0.7; blip(170, 0.2, "sawtooth", 0.05); }
+            } else if (z.phase === "wind"){
+              sp = 0;
+              if (z.ctimer <= 0){ z.phase = "charge"; z.ctimer = 0.85; z.cdir = z.face; }
+            } else {
+              sp = 400; moveA = z.cdir;
+              if (z.ctimer <= 0){ z.phase = "walk"; z.ctimer = 6; }
+            }
+          }
+        }
+        if (z.kind === "boss"){
+          var bfr = z.hp / z.maxhp;
+          sp = BOSS.speed + (1 - bfr) * 34;
+          // sóng xung kích đều đặn, nửa máu cuối thì dồn dập hơn
+          if (z.timer <= 0){
+            z.timer = bfr > 0.4 ? 5.5 : 3.2;
+            shockwave(z);
+          }
+          // lao húc xen giữa các đợt sóng, có pha vẩy chân báo trước
+          z.ctimer -= dt;
+          if (z.phase === "walk"){
+            if (z.ctimer <= 0){ z.phase = "wind"; z.ctimer = 0.75; blip(160, 0.22, "sawtooth", 0.055); }
+          } else if (z.phase === "wind"){
+            sp = 0;
+            if (z.ctimer <= 0){ z.phase = "charge"; z.ctimer = 0.9; z.cdir = z.face; }
+          } else {
+            sp = 470; moveA = z.cdir;
+            if (z.ctimer <= 0){ z.phase = "walk"; z.ctimer = bfr > 0.4 ? 7 : 4.5; }
+          }
+        }
+      } else {
+        z.face = toPlayer;
+        var tx = p.x, ty = p.y;
+        if (z.flanker && d > 130){ tx = p.x - Math.cos(p.a) * 105; ty = p.y - Math.sin(p.a) * 105; }
+        moveA = Math.atan2(ty - z.y, tx - z.x) + (z.type === "walker" ? Math.sin(z.wob) * 0.16 : 0);
+      }
+
+      z.vx = Math.cos(moveA) * sp; z.vy = Math.sin(moveA) * sp;
+      z.x += z.vx * dt; z.y += z.vy * dt;
+
+      if (d < z.r + p.r && z.cd <= 0){
+        z.cd = z.touch;
+        if (hitPlayer(z.dmg * (z.kind === "charger" && z.phase === "charge" ? 1.6 : 1))) return;
+        p.x -= dx / d * 6; p.y -= dy / d * 6;
+        if (!z.elite && z.kind !== "mini" && z.kind !== "boss"){ z.x += dx / d * 8; z.y += dy / d * 8; }
+      }
+      if (G.arena) clampToArena(z, z.r);
+      // Bị bỏ xa quá thì dời ra rìa vòng sinh thay vì xoá: giữ nguyên áp lực đám đông
+      // mà không để quái bị bỏ rơi chiếm chỗ trong giới hạn số quái sống.
+      if (!z.elite && z.kind !== "mini" && z.kind !== "boss" && !G.arena){
+        var fdx = z.x - p.x, fdy = z.y - p.y, cull = cullRadius();
+        if (fdx * fdx + fdy * fdy > cull * cull){
+          var rp = spawnPos(); z.x = rp.x; z.y = rp.y; z.hit = 0; z.cd = 0;
+        }
+      }
+    }
+
+    // ---- separation (skip when the crowd gets huge, it is only cosmetic)
+    if (zs.length < 110){
+      for (var a1 = 0; a1 < zs.length; a1++){
+        var za = zs[a1]; if (za.dead || za.kind === "mini" || za.kind === "boss") continue;
+        for (var b1 = a1 + 1; b1 < zs.length; b1++){
+          var zb = zs[b1]; if (zb.dead || zb.kind === "mini" || zb.kind === "boss") continue;
+          var sx = zb.x - za.x, sy = zb.y - za.y, rr = za.r + zb.r;
+          if (Math.abs(sx) > rr || Math.abs(sy) > rr) continue;
+          var sd = Math.hypot(sx, sy) || 0.01;
+          if (sd < rr){
+            var push = (rr - sd) * 0.42, nx = sx / sd * push, ny = sy / sd * push;
+            za.x -= nx; za.y -= ny; zb.x += nx; zb.y += ny;
+          }
+        }
+      }
+    }
+
+    // ---- bullets
+    for (var bi = G.bullets.length - 1; bi >= 0; bi--){
+      var b = G.bullets[bi];
+      var stepX = b.vx * dt, stepY = b.vy * dt;
+      b.x += stepX; b.y += stepY;
+      b.left -= Math.hypot(stepX, stepY);
+      if (b.left <= 0){
+        // Bản đồ vô tận nên không còn tường để dội. Xuyên Phá nâng Đạn nảy thì hết tầm
+        // viên đạn quay đầu bay ngược lại, cày thêm một lượt về qua chính hàng quái đó.
+        if (b.rebound > 0){
+          b.vx = -b.vx; b.vy = -b.vy;
+          b.rebound--;
+          b.left = b.range;
+          b.hits.length = 0;
+          b.dmg *= 0.85;
+          spark(b.x, b.y, 6, b.c, 150, 0.3);
+          blip(840, 0.04, "triangle", 0.022);
+          if (T.shake) G.shake = Math.min(11, G.shake + 1.4);
+          continue;
+        }
+        G.bullets.splice(bi, 1); continue;
+      }
+      for (var zj = 0; zj < zs.length; zj++){
+        var zz = zs[zj];
+        if (zz.dead || b.hits.indexOf(zz) >= 0) continue;
+        if (Math.abs(zz.x - b.x) > zz.r + b.rad + 2 || Math.abs(zz.y - b.y) > zz.r + b.rad + 2) continue;
+        if (Math.hypot(zz.x - b.x, zz.y - b.y) > zz.r + b.rad) continue;
+
+        if (!b.counted){ G.hitshots++; b.counted = true; }
+        var kl = Math.hypot(b.vx, b.vy) || 1;
+        var travel = Math.atan2(b.vy, b.vx);
+        zz.x += b.vx / kl * b.kb * 0.08; zz.y += b.vy / kl * b.kb * 0.08;
+        spark(b.x, b.y, 4, "rgba(190,60,60,.9)", 120, 0.32);
+        blip(700 + Math.random() * 200, 0.02, "square", 0.012);
+        hurt(zz, b.dmg, travel, !!b.hex);
+
+        b.hits.push(zz);
+        if (b.pierceLeft > 0){ b.pierceLeft--; continue; }
+        if (b.bounce > 0 && bounceTo(b, zz)){ b.bounce--; b.pierceLeft = b.pierce; break; }
+        G.bullets.splice(bi, 1);
+        break;
+      }
+    }
+
+    // ---- xp orbs: vào tầm hút là lao thẳng vào người chơi, không lượn lờ
+    for (var oi = G.orbs.length - 1; oi >= 0; oi--){
+      var o = G.orbs[oi];
+      var odx = p.x - o.x, ody = p.y - o.y, od = Math.hypot(odx, ody) || 1;
+      if (!o.homing && od < 175) o.homing = true;
+      if (o.homing){
+        o.sp = Math.min(1700, (o.sp || 320) + 3000 * dt);
+        o.x += odx / od * o.sp * dt; o.y += ody / od * o.sp * dt;
+      } else {
+        o.x += o.vx * dt; o.y += o.vy * dt; o.vx *= 0.9; o.vy *= 0.9;
+      }
+      if (od < p.r + 13){
+        gainXp(o.v);
+        G.orbs.splice(oi, 1);
+        blip(1050 + Math.random() * 120, 0.03, "sine", 0.02);
+      }
+    }
+
+    // ---- vàng, bình máu, nam châm
+    for (var ii = G.items.length - 1; ii >= 0; ii--){
+      var it = G.items[ii];
+      it.t += dt;
+      var idx = p.x - it.x, idy = p.y - it.y, idd = Math.hypot(idx, idy) || 1;
+      if (it.kind === "gold"){
+        if (!it.homing && idd < 175) it.homing = true;
+        if (it.homing){
+          it.sp = Math.min(1500, (it.sp || 280) + 2600 * dt);
+          it.x += idx / idd * it.sp * dt; it.y += idy / idd * it.sp * dt;
+        } else {
+          it.x += it.vx * dt; it.y += it.vy * dt; it.vx *= 0.9; it.vy *= 0.9;
+        }
+        if (idd < p.r + 13){
+          G.gold += it.v;
+          G.items.splice(ii, 1);
+          blip(1280 + Math.random() * 90, 0.04, "sine", 0.022);
+        }
+        continue;
+      }
+      // Bình máu và nam châm cũng bay được về khi bị đánh dấu homing. Cần thế, vì lúc vòng vây
+      // khép lại mà chúng nằm ngoài tường thì người chơi vĩnh viễn không với tới nữa.
+      if (it.homing){
+        it.sp = Math.min(1400, (it.sp || 260) + 2400 * dt);
+        it.x += idx / idd * it.sp * dt; it.y += idy / idd * it.sp * dt;
+      } else {
+        it.x += it.vx * dt; it.y += it.vy * dt; it.vx *= 0.88; it.vy *= 0.88;
+      }
+      if (idd < p.r + 22){
+        if (it.kind === "hp"){
+          var heal = Math.round(p.maxhp * 0.25);
+          p.hp = Math.min(p.maxhp, p.hp + heal);
+          dmgNum(p.x, p.y - 24, heal, true);
+          ring(p.x, p.y, 40, "rgba(255,107,94,.85)");
+          blip(720, 0.13, "sine", 0.05);
+        } else {
+          G.orbs.forEach(function(oo){ oo.homing = true; });
+          G.items.forEach(function(gg){ if (gg.kind === "gold") gg.homing = true; });
+          ring(p.x, p.y, 300, "rgba(78,201,224,.9)");
+          blip(520, 0.1, "sine", 0.05);
+          blip(880, 0.15, "sine", 0.04);
+        }
+        G.items.splice(ii, 1);
+      }
+    }
+
+    // ---- crates
+    for (var ci = G.crates.length - 1; ci >= 0; ci--){
+      var cr = G.crates[ci];
+      cr.t += dt;
+      if (Math.hypot(p.x - cr.x, p.y - cr.y) < p.r + 22){
+        G.crates.splice(ci, 1);
+        blip(520, 0.14, "triangle", 0.06);
+        blip(780, 0.16, "triangle", 0.05);
+        if (cr.last) G.bossAfterPick = true;
+        queuePick(cr.unique && !G.unique ? "unique" : "crate");
+      }
+    }
+
+    // ---- sóng xung kích của trùm chính: chỉ ăn đòn đúng lúc vành sóng quét qua người
+    for (var wi = G.waves.length - 1; wi >= 0; wi--){
+      var wv = G.waves[wi];
+      wv.r += wv.sp * dt;
+      if (!wv.hit){
+        var wdd = Math.hypot(p.x - wv.x, p.y - wv.y);
+        if (Math.abs(wdd - wv.r) < p.r + 13){
+          wv.hit = true;
+          if (hitPlayer(wv.dmg)) return;
+        }
+      }
+      if (wv.r > wv.max) G.waves.splice(wi, 1);
+    }
+
+    // ---- xác chờ chạy hết hoạt cảnh chết
+    for (var cq = G.corpses.length - 1; cq >= 0; cq--){
+      var co = G.corpses[cq];
+      co.life -= dt; co.ft += dt;
+      if (co.life <= 0) G.corpses.splice(cq, 1);
+    }
+
+    // ---- fx
+    for (var pi = G.parts.length - 1; pi >= 0; pi--){
+      var qq = G.parts[pi];
+      qq.life -= dt;
+      if (qq.life <= 0){ G.parts.splice(pi, 1); continue; }
+      qq.x += qq.vx * dt; qq.y += qq.vy * dt; qq.vx *= 0.93; qq.vy *= 0.93;
+    }
+    for (var ri = G.rings.length - 1; ri >= 0; ri--){
+      var rg = G.rings[ri];
+      rg.life -= dt; rg.r += (rg.max - rg.r) * Math.min(1, dt * 12);
+      if (rg.life <= 0) G.rings.splice(ri, 1);
+    }
+    for (var ni = G.nums.length - 1; ni >= 0; ni--){
+      var nn = G.nums[ni];
+      nn.life -= dt; nn.y -= dt * 26;
+      if (nn.life <= 0) G.nums.splice(ni, 1);
+    }
+
+    // ---- sweep dead
+    if (zs.some(function(z){ return z.dead; }))
+      G.zombies = zs.filter(function(z){ return !z.dead; });
+
+    updateHUD();
+  }
+
+  // ================================================================ flow
+  function die(){
+    G.state = "dead";
+    $("d-time").textContent = fmtTime(G.t);
+    $("d-kills").textContent = G.kills;
+    $("d-lvl").textContent = G.lvl;
+    $("d-gold").textContent = G.gold;
+    $("ov-dead").classList.add("on");
+    noise(0.5, 0.12);
+  }
+  function win(){
+    G.state = "win";
+    G.mini = null; G.boss = null; G.bossRef = null; G.arena = null;
+    $("bosswrap").hidden = true;
+    $("v-time").textContent = fmtTime(G.t);
+    $("v-kills").textContent = G.kills;
+    $("v-lvl").textContent = G.lvl;
+    $("v-gold").textContent = G.gold;
+    $("v-acc").textContent = G.shots ? Math.round(G.hitshots / G.shots * 100) + "%" : "0%";
+    $("ov-win").classList.add("on");
+    blip(660, 0.3, "triangle", 0.07);
+    blip(880, 0.4, "triangle", 0.05);
+  }
+  // Mọi đường quay lại "play" đều phải đi qua đây: nó vừa gỡ overlay vừa xả hàng chờ
+  // nâng cấp. Nếu không, các nâng cấp xếp hàng lúc đang tạm dừng sẽ kẹt lại vô hình.
+  function resumePlay(){
+    G.state = "play";
+    panelPaused = false;
+    $("ov-pause").classList.remove("on");
+    if (G.pending.length) openNextPick();
+  }
+  function togglePause(){
+    if (!G || G.state === "dead" || G.state === "pick" || G.state === "win") return;
+    if (G.state === "play"){ G.state = "pause"; panelPaused = false; $("ov-pause").classList.add("on"); }
+    else resumePlay();
+  }
+
+  // ================================================================ lớp art
+  // Mọi thứ nhìn thấy trên sân đều đi qua đây. Hôm nay chưa có tấm ảnh nào nên mọi hàm
+  // đều rơi về hình vẽ tay như cũ; khi có atlas thì nạp vào ART.img và đường sprite tự
+  // bật lên, logic game không phải sửa một dòng.
+  //
+  // Mô hình hướng nhìn đã chốt: thân người KHÔNG xoay, chỉ lật trái/phải theo hướng ngắm;
+  // riêng khẩu súng là sprite rời xoay 360° quanh vai. Rẻ hơn bộ 8 hướng khoảng 4 lần và
+  // vẫn đọc được hướng bắn. Art nguồn: nhân vật 128px, zombie thường 96, elite 192, trùm 256.
+  var ART = { img:{}, pending:0 };
+  function sprite(name){ return name ? ART.img[name] || null : null; }
+  function loadArt(manifest, done){
+    var keys = Object.keys(manifest);
+    if (!keys.length) { if (done) done(); return; }
+    ART.pending += keys.length;
+    keys.forEach(function(k){
+      var im = new Image();
+      im.onload = function(){ ART.img[k] = im; if (!--ART.pending && done) done(); };
+      im.onerror = function(){ if (!--ART.pending && done) done(); };
+      im.src = manifest[k];
+    });
+  }
+  // tên sprite theo loại thực thể — để trống nghĩa là "vẽ tay"
+  var SKIN = { player:"", walker:"", runner:"", armor:"", splitter:"", summoner:"",
+               charger:"", shield:"", mini:"" };
+  var ANIM = { walk:{ n:6, fps:9 }, idle:{ n:4, fps:5 }, die:{ n:10, fps:14 } };
+
+  // Vẽ một thực thể bằng sprite. Trả về false nếu chưa có ảnh, để nơi gọi vẽ tay thay thế.
+  function drawSprite(e, kind, ang){
+    var im = sprite(SKIN[kind]);
+    if (!im) return false;
+    var a = ANIM[e.anim || "walk"] || ANIM.walk;
+    var fr = Math.floor((e.ft || 0) * a.fps) % a.n;
+    var fw = im.height, sx = fr * fw;              // atlas một hàng ngang, ô vuông
+    var sc = (e.r * 2.6) / fw;
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    if (Math.cos(ang) < 0) ctx.scale(-1, 1);       // chỉ lật, không xoay thân
+    ctx.drawImage(im, sx, 0, fw, fw, -fw * sc / 2, -fw * sc * 0.62, fw * sc, fw * sc);
+    ctx.restore();
+    return true;
+  }
+
+  // ---- chủ đề khu vực. Hôm nay prop là hình vẽ tay; khi có art thì thay drawProp bằng
+  // drawImage và thêm trường ground là ảnh lát nền liền mạch 256×256.
+  var THEMES = {
+    farm: { g0:"#1e2a18", g1:"#0e1410", grid:"rgba(255,255,255,.028)", ground:"", props:3 },
+    war:  { g0:"#2a2418", g1:"#14110c", grid:"rgba(255,220,160,.030)", ground:"", props:3 },
+    city: { g0:"#191d24", g1:"#0b0d11", grid:"rgba(180,210,255,.034)", ground:"", props:3 }
+  };
+  function theme(){ return THEMES[T.theme] || THEMES.farm; }
+
+  // Vật trang trí đặt cố định theo toạ độ ô bằng hash2, nên chạy đi rồi quay lại vẫn thấy
+  // đúng đống rơm ở đúng chỗ, mà không phải lưu gì. Khi có sprite thì thân hàm này chỉ còn
+  // một lệnh drawImage, chỗ đặt giữ nguyên.
+  function drawProp(th, idx, s, rot){
+    ctx.rotate(rot);
+    if (T.theme === "war"){
+      if (idx === 0){                                    // ụ bao cát
+        ctx.fillStyle = "rgba(96,86,58,.5)";
+        for (var i = 0; i < 3; i++){
+          ctx.beginPath();
+          ctx.ellipse(-s * 0.4 + i * s * 0.4, i % 2 ? -s * 0.16 : 0, s * 0.3, s * 0.17, 0, 0, 6.283);
+          ctx.fill();
+        }
+      } else if (idx === 1){                             // hố đạn
+        ctx.fillStyle = "rgba(0,0,0,.30)";
+        ctx.beginPath(); ctx.ellipse(0, 0, s, s * 0.66, 0, 0, 6.283); ctx.fill();
+        ctx.strokeStyle = "rgba(120,100,70,.22)"; ctx.lineWidth = s * 0.14;
+        ctx.beginPath(); ctx.ellipse(0, 0, s * 0.96, s * 0.63, 0, 0, 6.283); ctx.stroke();
+      } else {                                           // xác xe
+        ctx.fillStyle = "rgba(70,72,66,.42)";
+        ctx.fillRect(-s * 0.8, -s * 0.34, s * 1.6, s * 0.68);
+        ctx.fillStyle = "rgba(20,22,20,.5)";
+        ctx.fillRect(-s * 0.3, -s * 0.24, s * 0.7, s * 0.48);
+      }
+    } else if (T.theme === "city"){
+      if (idx === 0){                                    // xe hơi bỏ lại
+        ctx.fillStyle = "rgba(78,84,96,.44)";
+        ctx.fillRect(-s * 0.85, -s * 0.38, s * 1.7, s * 0.76);
+        ctx.fillStyle = "rgba(140,170,200,.22)";
+        ctx.fillRect(-s * 0.25, -s * 0.3, s * 0.6, s * 0.6);
+      } else if (idx === 1){                             // nắp cống
+        ctx.fillStyle = "rgba(0,0,0,.26)";
+        ctx.beginPath(); ctx.arc(0, 0, s * 0.42, 0, 6.283); ctx.fill();
+        ctx.strokeStyle = "rgba(150,160,175,.18)"; ctx.lineWidth = s * 0.06;
+        ctx.beginPath(); ctx.arc(0, 0, s * 0.42, 0, 6.283); ctx.stroke();
+      } else {                                           // vạch kẻ đường
+        ctx.fillStyle = "rgba(226,222,186,.20)";
+        for (var d = 0; d < 3; d++) ctx.fillRect(-s + d * s * 0.85, -s * 0.07, s * 0.55, s * 0.14);
+      }
+    } else {
+      if (idx === 0){                                    // cuộn rơm
+        ctx.fillStyle = "rgba(152,126,58,.46)";
+        ctx.beginPath(); ctx.ellipse(0, 0, s * 0.54, s * 0.46, 0, 0, 6.283); ctx.fill();
+        ctx.strokeStyle = "rgba(78,62,26,.5)"; ctx.lineWidth = s * 0.06;
+        ctx.beginPath(); ctx.ellipse(0, 0, s * 0.54, s * 0.46, 0, 0, 6.283); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(0, 0, s * 0.3, s * 0.26, 0, 0, 6.283); ctx.stroke();
+      } else if (idx === 1){                             // luống cày
+        ctx.strokeStyle = "rgba(96,80,40,.30)"; ctx.lineWidth = s * 0.13;
+        ctx.beginPath();
+        for (var f = -2; f <= 2; f++){ ctx.moveTo(-s * 1.1, f * s * 0.32); ctx.lineTo(s * 1.1, f * s * 0.32); }
+        ctx.stroke();
+      } else {                                           // hàng rào
+        ctx.strokeStyle = "rgba(126,100,58,.52)"; ctx.lineWidth = s * 0.11;
+        ctx.beginPath();
+        ctx.moveTo(-s, -s * 0.1); ctx.lineTo(s, -s * 0.1);
+        ctx.moveTo(-s, s * 0.14); ctx.lineTo(s, s * 0.14);
+        for (var q = -1; q <= 1; q++){ ctx.moveTo(q * s * 0.75, -s * 0.34); ctx.lineTo(q * s * 0.75, s * 0.34); }
+        ctx.stroke();
+      }
+    }
+  }
+
+  // ================================================================ render
+  function draw(){
+    var w = view.cw, h = view.ch;
+    var p = G.player, ws = wstat(p.wi), wd = WEAPONS[p.wi];
+    // camera bám cứng nhân vật — bản đồ vô tận nên không có gì để kẹp camera vào
+    var vw = view.vw, vh = view.vh;
+    var left = view.left = p.x - vw / 2, top = view.top = p.y - vh / 2;
+
+    ctx.save();
+    ctx.fillStyle = "#0a0f0d"; ctx.fillRect(0, 0, w, h);
+    ctx.translate((Math.random() - 0.5) * G.shake, (Math.random() - 0.5) * G.shake);
+    ctx.scale(view.scale, view.scale);
+    ctx.translate(-left, -top);
+
+    var th = theme();
+    var gim = sprite(th.ground);
+    if (gim){
+      // ảnh lát nền liền mạch: pattern nằm trong hệ toạ độ thế giới nên tự cuộn theo
+      // camera và lát ra vô tận, không phải tính gì thêm
+      ctx.fillStyle = ctx.createPattern(gim, "repeat");
+      ctx.fillRect(left, top, vw, vh);
+      ctx.globalAlpha = 0.55;
+    }
+    var grd = ctx.createRadialGradient(p.x, p.y, 60, p.x, p.y, Math.max(vw, vh) * 0.72);
+    grd.addColorStop(0, th.g0); grd.addColorStop(1, th.g1);
+    ctx.fillStyle = grd; ctx.fillRect(left, top, vw, vh);
+    ctx.globalAlpha = 1;
+
+    // lưới trải theo bội số 60 quanh khung nhìn: đây là thứ duy nhất cho biết mình đang di chuyển
+    var gx0 = Math.floor(left / 60) * 60, gy0 = Math.floor(top / 60) * 60;
+    ctx.strokeStyle = th.grid; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (var gx = gx0; gx <= left + vw; gx += 60){ ctx.moveTo(gx, top); ctx.lineTo(gx, top + vh); }
+    for (var gy = gy0; gy <= top + vh; gy += 60){ ctx.moveTo(left, gy); ctx.lineTo(left + vw, gy); }
+    ctx.stroke();
+    drawGround(left, top, vw, vh);
+
+    if (T.showCone){
+      var half = (ws.arc / 2) * Math.PI / 180;
+      var arcR = Math.min(ws.range, Math.max(vw, vh));
+      ctx.beginPath(); ctx.moveTo(p.x, p.y);
+      ctx.arc(p.x, p.y, arcR, p.a - half, p.a + half); ctx.closePath();
+      var cg = ctx.createRadialGradient(p.x, p.y, 10, p.x, p.y, arcR);
+      cg.addColorStop(0, "rgba(142,230,74,.09)"); cg.addColorStop(1, "rgba(142,230,74,0)");
+      ctx.fillStyle = cg; ctx.fill();
+      ctx.strokeStyle = "rgba(142,230,74,.14)"; ctx.lineWidth = 1; ctx.stroke();
+    }
+    if (T.showCone && G.target && !G.target.dead){
+      ctx.strokeStyle = G.rearLock ? "rgba(255,179,64,.9)" : "rgba(142,230,74,.75)";
+      ctx.lineWidth = 1.2; ctx.setLineDash([5, 5]);
+      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(G.target.x, G.target.y); ctx.stroke();
+      ctx.setLineDash([]); ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.arc(G.target.x, G.target.y - 2, G.target.r + 7, 0, 6.283); ctx.stroke();
+    }
+
+    // sóng xung kích của trùm chính: vành sáng mới là chỗ gây sát thương, nên nó phải dày và rõ
+    G.waves.forEach(function(wv){
+      var fade = Math.max(0, 1 - wv.r / wv.max);
+      ctx.globalAlpha = 0.2 + 0.6 * fade;
+      ctx.strokeStyle = "rgba(255,83,71,.95)";
+      ctx.lineWidth = 6 + 6 * fade;
+      ctx.beginPath(); ctx.arc(wv.x, wv.y, wv.r, 0, 6.283); ctx.stroke();
+      ctx.globalAlpha = 0.12 + 0.2 * fade;
+      ctx.strokeStyle = "rgba(255,190,170,.9)"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(wv.x, wv.y, wv.r - 6, 0, 6.283); ctx.stroke();
+      ctx.globalAlpha = 1;
+    });
+
+    // rings (explosions, summons)
+    G.rings.forEach(function(r){
+      ctx.globalAlpha = Math.max(0, r.life / 0.38);
+      ctx.strokeStyle = r.c; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, 6.283); ctx.stroke();
+      ctx.globalAlpha = 1;
+    });
+
+    // xp orbs
+    G.orbs.forEach(function(o){
+      ctx.fillStyle = "rgba(78,201,224,.95)";
+      ctx.beginPath(); ctx.arc(o.x, o.y, 3.4, 0, 6.283); ctx.fill();
+      ctx.globalAlpha = 0.28; ctx.beginPath(); ctx.arc(o.x, o.y, 7, 0, 6.283); ctx.fill();
+      ctx.globalAlpha = 1;
+    });
+
+    // gold / health / magnet
+    G.items.forEach(function(it){
+      var bob = Math.sin(it.t * 4) * 2;
+      ctx.save();
+      if (it.kind === "gold"){
+        ctx.globalAlpha = 0.22; ctx.fillStyle = "#ffc846";
+        ctx.beginPath(); ctx.arc(it.x, it.y, 9, 0, 6.283); ctx.fill();
+        ctx.globalAlpha = 1; ctx.fillStyle = "#ffcf49";
+        ctx.beginPath(); ctx.arc(it.x, it.y, 4.6, 0, 6.283); ctx.fill();
+        ctx.fillStyle = "#fff2c0";
+        ctx.beginPath(); ctx.arc(it.x - 1.4, it.y - 1.5, 1.7, 0, 6.283); ctx.fill();
+      } else if (it.kind === "hp"){
+        ctx.translate(it.x, it.y + bob);
+        ctx.globalAlpha = 0.2; ctx.fillStyle = "#ff5347";
+        ctx.beginPath(); ctx.arc(0, 0, 18, 0, 6.283); ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "#ff6b5e";
+        ctx.fillRect(-9, -3.2, 18, 6.4); ctx.fillRect(-3.2, -9, 6.4, 18);
+        ctx.strokeStyle = "#5e1610"; ctx.lineWidth = 1.5;
+        ctx.strokeRect(-9, -3.2, 18, 6.4); ctx.strokeRect(-3.2, -9, 6.4, 18);
+      } else {
+        ctx.translate(it.x, it.y + bob);
+        ctx.globalAlpha = 0.2; ctx.fillStyle = "#4ec9e0";
+        ctx.beginPath(); ctx.arc(0, 0, 18, 0, 6.283); ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = "#4ec9e0"; ctx.lineWidth = 5; ctx.lineCap = "butt";
+        ctx.beginPath(); ctx.arc(0, 1, 7.5, Math.PI, 0); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(-7.5, 1); ctx.lineTo(-7.5, 8);
+        ctx.moveTo(7.5, 1); ctx.lineTo(7.5, 8);
+        ctx.stroke();
+      }
+      ctx.restore();
+    });
+
+    // crates
+    G.crates.forEach(function(c){
+      var pu = 0.6 + 0.4 * Math.sin(c.t * 5);
+      var body = c.unique ? "#6f3fb5" : "#c8922f";
+      var trim = c.unique ? "#c79bff" : "#ffd36a";
+      var edge = c.unique ? "#2c1450" : "#5c3f0e";
+      ctx.save();
+      ctx.globalAlpha = 0.25 * pu;
+      ctx.fillStyle = trim;
+      ctx.beginPath(); ctx.arc(c.x, c.y, c.unique ? 44 : 34, 0, 6.283); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.translate(c.x, c.y + Math.sin(c.t * 3) * 3);
+      ctx.rotate(Math.sin(c.t * 1.4) * 0.16);
+      var s = c.unique ? 19 : 15;
+      ctx.fillStyle = body; ctx.fillRect(-s, -s, s * 2, s * 2);
+      ctx.fillStyle = trim; ctx.fillRect(-s, -4, s * 2, 8); ctx.fillRect(-4, -s, 8, s * 2);
+      ctx.strokeStyle = edge; ctx.lineWidth = 2; ctx.strokeRect(-s, -s, s * 2, s * 2);
+      if (c.unique){
+        ctx.fillStyle = "#fff";
+        ctx.font = "700 15px 'Chakra Petch', sans-serif";
+        ctx.textAlign = "center"; ctx.fillText("★", 0, 5);
+      }
+      ctx.restore();
+    });
+
+    // spawn markers
+    G.markers.forEach(function(m){
+      var pulse = 0.4 + 0.6 * Math.abs(Math.sin(m.t * 9));
+      ctx.save(); ctx.globalAlpha = pulse;
+      ctx.strokeStyle = m.elite ? "#ff5347" : "#ffb340";
+      ctx.lineWidth = m.elite ? 3 : 2;
+      ctx.beginPath(); ctx.arc(m.x, m.y, (m.elite ? 26 : 15) + (1 - Math.min(1, m.t)) * 10, 0, 6.283); ctx.stroke();
+      ctx.restore();
+    });
+
+    G.bullets.forEach(function(b){
+      var l = Math.hypot(b.vx, b.vy) || 1;
+      ctx.strokeStyle = b.c; ctx.lineWidth = Math.max(2.2, b.rad * 0.95); ctx.lineCap = "round";
+      ctx.globalAlpha = 0.9;
+      ctx.beginPath();
+      ctx.moveTo(b.x, b.y);
+      ctx.lineTo(b.x - b.vx / l * b.trail * 1.7, b.y - b.vy / l * b.trail * 1.7);
+      ctx.stroke();
+      if (b.rad > 3.6){
+        ctx.globalAlpha = 0.5; ctx.fillStyle = b.c;
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.rad * 0.9, 0, 6.283); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    });
+
+    // Sắp theo trục y rồi mới vẽ: hình tròn thì chồng kiểu gì cũng được, nhưng sprite thì
+    // con đứng dưới phải đè lên con đứng trên, nếu không cả đám trông như dán phẳng.
+    var order = G.corpses.slice();
+    for (var zi = 0; zi < G.zombies.length; zi++) if (!G.zombies[zi].dead) order.push(G.zombies[zi]);
+    order.push(p);
+    order.sort(function(a, b){ return a.y - b.y; });
+    for (var oi = 0; oi < order.length; oi++){
+      var ent = order[oi];
+      if (ent === p) drawPlayer(p, wd);
+      else if (ent.corpse) drawCorpse(ent);
+      else drawZombie(ent);
+    }
+
+    G.parts.forEach(function(q){
+      ctx.globalAlpha = Math.max(0, q.life / (q.max || 0.5));
+      ctx.fillStyle = q.c;
+      ctx.beginPath(); ctx.arc(q.x, q.y, q.r, 0, 6.283); ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+
+    ctx.textAlign = "center";
+    G.nums.forEach(function(n){
+      ctx.globalAlpha = Math.max(0, n.life / 0.62);
+      ctx.font = (n.big ? "700 16px " : "600 13px ") + "'IBM Plex Mono', monospace";
+      ctx.fillStyle = n.big ? "#ffd36a" : "#e8f3df";
+      ctx.fillText(n.v, n.x, n.y);
+    });
+    ctx.globalAlpha = 1;
+    drawArena();
+    drawCrateCompass(p);
+    ctx.restore();
+
+    drawOffscreen(p);
+    drawArenaHud();
+
+    if (G.flash > 0){
+      ctx.fillStyle = "rgba(255,60,50," + (G.flash * 0.26) + ")";
+      ctx.fillRect(0, 0, w, h);
+    }
+    var vg = ctx.createRadialGradient(w/2, h/2, Math.min(w,h) * 0.35, w/2, h/2, Math.max(w,h) * 0.72);
+    vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,.55)");
+    ctx.fillStyle = vg; ctx.fillRect(0, 0, w, h);
+  }
+
+  // Vệt đất sinh ra cố định theo toạ độ ô nên đứng yên khi camera trôi qua, mà không
+  // phải lưu gì cả — bản đồ vô tận thì không thể dựng sẵn nền.
+  function hash2(i, j){
+    var n = Math.sin(i * 127.1 + j * 311.7) * 43758.5453;
+    return n - Math.floor(n);
+  }
+  function drawGround(left, top, vw, vh){
+    var C = 300, th = theme();
+    var i0 = Math.floor(left / C), i1 = Math.floor((left + vw) / C);
+    var j0 = Math.floor(top / C), j1 = Math.floor((top + vh) / C);
+    for (var i = i0; i <= i1; i++){
+      for (var j = j0; j <= j1; j++){
+        for (var k = 0; k < 2; k++){
+          var ha = hash2(i * 3 + k, j * 7 - k), hb = hash2(i * 11 - k, j * 5 + k), hc = hash2(i + k * 31, j - k * 17);
+          // vết đất mờ dưới cùng, giữ nguyên để nền không bao giờ trống trơn
+          var r = 18 + hc * 40;
+          ctx.fillStyle = hc > 0.5 ? "rgba(255,255,255,.011)" : "rgba(0,0,0,.11)";
+          ctx.beginPath();
+          ctx.ellipse(i * C + ha * C, j * C + hb * C, r, r * 0.62, ha * 3.14, 0, 6.283);
+          ctx.fill();
+        }
+      }
+    }
+    // Vật trang trí của khu vực đi trên một lưới dày hơn lưới vết đất, nếu không cả màn
+    // hình chỉ có một hai món và khu vực chẳng còn ra khu vực.
+    var P = 190;
+    var a0 = Math.floor(left / P), a1 = Math.floor((left + vw) / P);
+    var b0 = Math.floor(top / P), b1 = Math.floor((top + vh) / P);
+    for (var a = a0; a <= a1; a++){
+      for (var b = b0; b <= b1; b++){
+        var hp = hash2(a * 17 + 5, b * 23 - 3);
+        if (hp >= 0.52) continue;
+        var px = hash2(a * 41, b * 13), py = hash2(a * 7, b * 29), hs = hash2(a - 9, b + 4);
+        ctx.save();
+        ctx.translate(a * P + px * P, b * P + py * P);
+        drawProp(th, Math.floor(hp / 0.52 * th.props) % th.props, 30 + hs * 26, (px - 0.5) * 1.2);
+        ctx.restore();
+      }
+    }
+  }
+
+  // Bức tường của vòng vây trùm cuối: sáng dần từ trong ra mép, mép thì đập theo nhịp.
+  // Vẽ trong hệ toạ độ thế giới nên nó đứng yên còn camera trôi qua.
+  function drawArena(){
+    var A = G.arena;
+    if (!A) return;
+    var g = ctx.createRadialGradient(A.x, A.y, A.r * 0.80, A.x, A.y, A.r);
+    g.addColorStop(0, "rgba(255,60,50,0)");
+    g.addColorStop(1, "rgba(255,60,50,.26)");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(A.x, A.y, A.r, 0, 6.283); ctx.fill();
+    var pulse = 0.5 + 0.5 * Math.sin(G.t * 5);
+    ctx.strokeStyle = "rgba(255,96,84," + (0.45 + 0.4 * pulse).toFixed(2) + ")";
+    ctx.lineWidth = 3.5;
+    ctx.beginPath(); ctx.arc(A.x, A.y, A.r, 0, 6.283); ctx.stroke();
+    ctx.strokeStyle = "rgba(255,150,140,.18)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(A.x, A.y, A.r - 7, 0, 6.283); ctx.stroke();
+  }
+
+  // Mũi tên điều hướng bám quanh nhân vật, chỉ thẳng tới hộp nâng cấp. Tắt khi đã tới sát
+  // hộp, vì lúc đó người chơi nhìn thấy nó rồi và mũi tên chỉ làm rối.
+  function drawCrateCompass(p){
+    for (var i = 0; i < G.crates.length; i++){
+      var c = G.crates[i];
+      var dx = c.x - p.x, dy = c.y - p.y, d = Math.hypot(dx, dy);
+      if (d < 74) continue;
+      var a = Math.atan2(dy, dx), rr = p.r + 26 + Math.sin(c.t * 4) * 2.5;
+      var col = c.unique ? "#c79bff" : "#ffd36a";
+      ctx.save();
+      ctx.translate(p.x + Math.cos(a) * rr, p.y + Math.sin(a) * rr);
+      ctx.rotate(a);
+      ctx.globalAlpha = 0.28; ctx.fillStyle = col;
+      ctx.beginPath(); ctx.arc(0, 0, 11, 0, 6.283); ctx.fill();
+      ctx.globalAlpha = 0.95;
+      ctx.beginPath();
+      ctx.moveTo(10, 0); ctx.lineTo(-5, 6.5); ctx.lineTo(-2, 0); ctx.lineTo(-5, -6.5);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+      ctx.globalAlpha = 0.6; ctx.fillStyle = col;
+      ctx.font = "600 9px 'IBM Plex Mono', monospace"; ctx.textAlign = "center";
+      ctx.fillText(Math.round(d / 10) + "m",
+                   p.x + Math.cos(a) * (rr + 15), p.y + Math.sin(a) * (rr + 15) + 3);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // Thông báo và đếm ngược là lớp DOM (#arenamsg) chứ không vẽ trên canvas, để nó nằm trên
+  // các chip HUD. Ở đây chỉ bật/tắt và đổi con số.
+  var lastCount = null;
+  function drawArenaHud(){
+    var A = G.arena, el = $("arenamsg");
+    if (!A || A.phase !== "count"){
+      if (lastCount !== null){ el.hidden = true; lastCount = null; }
+      return;
+    }
+    var n = Math.ceil(A.t - 0.9);
+    var label = n > 0 ? String(n) : t("arena.go");
+    if (label !== lastCount){
+      $("am-count").textContent = label;
+      lastCount = label;
+    }
+    if (el.hidden) el.hidden = false;
+  }
+
+  // Không còn cạnh bản đồ để nhìn thấy mọi thứ: hộp nâng cấp, tinh anh, trùm phụ và
+  // vật phẩm hiếm có thể nằm ngoài khung hình, thiếu mũi chỉ hướng là mất luôn phần thưởng.
+  function drawOffscreen(p){
+    // chừa chỗ cho HUD ở trên và thanh gợi ý ở dưới, nếu không mũi tên bị các lớp DOM che mất
+    var w = view.cw, h = view.ch, s = view.scale;
+    var mx = 30, mt = Math.min(72, h * 0.12), mb = Math.min(72, h * 0.12), list = [];
+    G.crates.forEach(function(c){ list.push({ x:c.x, y:c.y, c:c.unique ? "#c79bff" : "#ffd36a", s:1 }); });
+    G.zombies.forEach(function(z){
+      if (z.dead) return;
+      if (z.kind === "boss") list.push({ x:z.x, y:z.y, c:BOSS.c, s:1.4 });
+      else if (z.kind === "mini") list.push({ x:z.x, y:z.y, c:MINI.c, s:1.2 });
+      else if (z.elite) list.push({ x:z.x, y:z.y, c:z.color, s:0.85 });
+    });
+    G.items.forEach(function(it){
+      if (it.kind === "hp") list.push({ x:it.x, y:it.y, c:"#ff6b5e", s:0.7 });
+      else if (it.kind === "magnet") list.push({ x:it.x, y:it.y, c:"#4ec9e0", s:0.7 });
+    });
+    ctx.font = "600 9px 'IBM Plex Mono', monospace";
+    ctx.textAlign = "center";
+    for (var i = 0; i < list.length; i++){
+      var o = list[i];
+      var sx = w / 2 + (o.x - p.x) * s, sy = h / 2 + (o.y - p.y) * s;
+      if (sx > mx && sx < w - mx && sy > mt && sy < h - mb) continue;
+      var a = Math.atan2(o.y - p.y, o.x - p.x);
+      var cx = Math.max(mx, Math.min(w - mx, sx)), cy = Math.max(mt, Math.min(h - mb, sy));
+      ctx.save();
+      ctx.translate(cx, cy); ctx.rotate(a);
+      ctx.globalAlpha = 0.9; ctx.fillStyle = o.c;
+      ctx.beginPath();
+      ctx.moveTo(11 * o.s, 0); ctx.lineTo(-7 * o.s, 7 * o.s); ctx.lineTo(-7 * o.s, -7 * o.s);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+      ctx.globalAlpha = 0.55; ctx.fillStyle = o.c;
+      ctx.fillText(Math.round(Math.hypot(o.x - p.x, o.y - p.y) / 10) + "m",
+                   cx - Math.cos(a) * 18, cy - Math.sin(a) * 18 + 3);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // Xác nằm lại để chạy hết hoạt cảnh chết. Hôm nay chưa bộ da nào có hoạt cảnh "die"
+  // nên danh sách này luôn rỗng và zombie vẫn tan thành hạt như cũ.
+  function drawCorpse(c){
+    ctx.globalAlpha = Math.max(0, c.life / c.max);
+    drawSprite(c, c.kind, c.face);
+    ctx.globalAlpha = 1;
+  }
+
+  function drawZombie(z){
+    var x = z.x, y = z.y, r = z.r;
+    var big = !!z.elite || z.kind === "mini" || z.kind === "boss";
+    // đường sprite: có ảnh thì vẽ ảnh rồi chỉ chồng thêm phần thông tin (thanh máu, khiên)
+    if (drawSprite(z, z.kind || z.type, z.face)){ drawZombieBadges(z); return; }
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,.42)";
+    ctx.beginPath(); ctx.ellipse(x, y + r * 0.62, r * 1.02, r * 0.42, 0, 0, 6.283); ctx.fill();
+
+    var col = z.hit > 0 ? "#ffffff" : z.color;
+    var g = ctx.createRadialGradient(x - r * 0.35, y - r * 0.5, r * 0.15, x, y, r * 1.15);
+    g.addColorStop(0, col); g.addColorStop(1, z.dark);
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y - r * 0.18, r, 0, 6.283); ctx.fill();
+    ctx.strokeStyle = big ? "rgba(0,0,0,.6)" : "rgba(0,0,0,.35)";
+    ctx.lineWidth = big ? 2.5 : 1.5; ctx.stroke();
+
+    // eye / facing dot
+    ctx.fillStyle = z.type === "runner" ? "rgba(255,225,225,.85)" : "rgba(240,255,225,.6)";
+    ctx.beginPath();
+    ctx.arc(x + Math.cos(z.face) * r * 0.5, y - r * 0.18 + Math.sin(z.face) * r * 0.5, r * 0.22, 0, 6.283);
+    ctx.fill();
+
+    if (z.kind === "armor"){
+      ctx.strokeStyle = "#dfe8ee"; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.arc(x, y - r * 0.18, r + 3, z.face - 1.2, z.face + 1.2); ctx.stroke();
+    }
+    if ((z.kind === "charger" || z.kind === "mini" || z.kind === "boss") && z.phase === "wind"){
+      ctx.strokeStyle = "rgba(255,120,60,.9)"; ctx.lineWidth = 2; ctx.setLineDash([7, 7]);
+      ctx.beginPath(); ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.cos(z.face) * 320, y + Math.sin(z.face) * 320); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    if (z.kind === "shield" && z.shield){
+      ctx.strokeStyle = "rgba(95,212,232,.9)"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(x, y - r * 0.18, r + 8, 0, 6.283); ctx.stroke();
+      ctx.globalAlpha = 0.14; ctx.fillStyle = "#5fd4e8";
+      ctx.beginPath(); ctx.arc(x, y - r * 0.18, r + 8, 0, 6.283); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    ctx.restore();
+    drawZombieBadges(z);
+  }
+
+  // Thanh máu và tên tinh anh: phần thông tin, không phải phần tạo hình, nên nó nằm riêng
+  // và cả đường vẽ tay lẫn đường sprite đều dùng chung.
+  function drawZombieBadges(z){
+    if (!z.elite) return;
+    var bw = z.r * 2.4, frac = Math.max(0, z.hp / z.maxhp);
+    ctx.fillStyle = "rgba(0,0,0,.6)"; ctx.fillRect(z.x - bw/2, z.y - z.r - 16, bw, 5);
+    ctx.fillStyle = z.color; ctx.fillRect(z.x - bw/2, z.y - z.r - 16, bw * frac, 5);
+    ctx.font = "600 9px 'IBM Plex Mono', monospace";
+    ctx.textAlign = "center"; ctx.fillStyle = z.color;
+    ctx.fillText(t("elite." + z.kind).toUpperCase(), z.x, z.y - z.r - 21);
+  }
+
+  function drawPlayer(p, wd){
+    var x = p.x, y = p.y, S = p.r / 14;
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,.5)";
+    ctx.beginPath(); ctx.ellipse(x, y + 10 * S, 16 * S, 6.6 * S, 0, 0, 6.283); ctx.fill();
+
+    // Thân người: sprite chỉ lật trái/phải, còn khẩu súng bên dưới vẫn xoay đủ 360°.
+    // Đó là lý do hai thứ này được vẽ tách rời ngay từ bản đầu tiên.
+    var body = drawSprite(p, "player", p.a);
+
+    ctx.save();
+    ctx.translate(x, y - 3 * S); ctx.rotate(p.a);
+    var len = (wd.id === "minigun" ? 30 : wd.id === "sniper" ? 36 : 24) * S;
+    ctx.fillStyle = "#39463d"; ctx.fillRect(4 * S, -4.5 * S, len, 9 * S);
+    ctx.fillStyle = wd.color; ctx.fillRect(len - 4 * S, -3 * S, 5 * S, 6 * S);
+    if (wd.id === "minigun"){
+      ctx.fillStyle = "rgba(255,255,255," + (0.06 + p.spin * 0.24).toFixed(3) + ")";
+      ctx.fillRect(8 * S, -6.5 * S, len - 8 * S, 13 * S);
+    }
+    if (p.muzzle > 0){
+      ctx.globalAlpha = p.muzzle / 0.055;
+      ctx.fillStyle = "#fff3c4";
+      ctx.beginPath(); ctx.arc(len + 5 * S, 0, 8 * S, 0, 6.283); ctx.fill();
+      ctx.fillStyle = "rgba(255,190,80,.7)";
+      ctx.beginPath(); ctx.arc(len + 9 * S, 0, 13 * S, 0, 6.283); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+
+    if (!body){
+      var bg = ctx.createRadialGradient(x - 5 * S, y - 10 * S, 3, x, y - 3 * S, 17 * S);
+      bg.addColorStop(0, p.iframe > 0 ? "#ffffff" : "#d9e8dc");
+      bg.addColorStop(1, p.iframe > 0 ? "#9fd4b0" : "#69836f");
+      ctx.fillStyle = bg;
+      ctx.beginPath(); ctx.arc(x, y - 3 * S, p.r, 0, 6.283); ctx.fill();
+      ctx.strokeStyle = "#0e1512"; ctx.lineWidth = 2 * S; ctx.stroke();
+      ctx.fillStyle = wd.color;
+      ctx.beginPath();
+      ctx.arc(x + Math.cos(p.a) * 8 * S, y - 3 * S + Math.sin(p.a) * 8 * S, 4.4 * S, 0, 6.283);
+      ctx.fill();
+    }
+    if (wd.steady && p.stillT >= STEADY_AFTER){
+      ctx.strokeStyle = "rgba(207,232,255,.55)"; ctx.lineWidth = 1.4;
+      ctx.setLineDash([3, 4]);
+      ctx.beginPath(); ctx.arc(x, y - 3 * S, p.r + 5, 0, 6.283); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    if (p.shieldUp){
+      var sr = p.r + 8;
+      ctx.globalAlpha = 0.1; ctx.fillStyle = "#b07cff";
+      ctx.beginPath(); ctx.arc(x, y - 3 * S, sr, 0, 6.283); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = "rgba(176,124,255,.85)"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x, y - 3 * S, sr + Math.sin(G.t * 4) * 1.4, 0, 6.283); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ================================================================ hud
+  var fpsAcc = 0, fpsN = 0;
+  function updateHUD(){
+    var p = G.player;
+    var ratio = Math.max(0, p.hp / p.maxhp);
+    var hf = $("hpfill");
+    hf.style.transform = "scaleX(" + ratio + ")";
+    hf.classList.toggle("low", ratio < 0.34);
+    $("hptext").textContent = Math.ceil(p.hp) + " / " + p.maxhp;
+
+    var sb = $("shieldbar");
+    if (u("shield") > 0){
+      sb.hidden = false;
+      sb.classList.toggle("ready", p.shieldUp);
+      var sfrac = p.shieldUp ? 1 : Math.max(0, Math.min(1, 1 - p.shieldT / shieldCd()));
+      $("shieldfill").style.transform = "scaleX(" + sfrac + ")";
+      $("shieldtext").textContent = p.shieldUp
+        ? t("hud.shieldReady")
+        : t("hud.shieldCd", { s:Math.ceil(p.shieldT) });
+    } else sb.hidden = true;
+
+    $("xpfill").style.transform = "scaleX(" + Math.max(0, Math.min(1, G.xp / G.xpNext)) + ")";
+    $("xptext").textContent = t("hud.level", { n:G.lvl });
+    $("c-adv").textContent = G.adv + "/" + ADV_TOTAL;
+    $("c-gold").textContent = G.gold;
+    $("c-kills").textContent = G.kills;
+    $("c-modev").textContent = !G.target ? t("aim.none") : t(G.rearLock ? "aim.rear" : "aim.front");
+    $("c-mode").classList.toggle("rear", !!G.rearLock);
+
+    var over = G.t > LEVEL_TIME;
+    var tEl = $("timer");
+    tEl.textContent = fmtTime(G.t);
+    tEl.classList.toggle("over", over);
+    var sub = $("timersub");
+    var br = G.bossRef && !G.bossRef.dead ? G.bossRef : null;
+    if (br){
+      sub.textContent = t(br.kind === "boss" ? "sub.boss" : "sub.mini", { n:t(G.bossKey) });
+      sub.classList.add("hot");
+    }
+    else if (G.crates.length){ sub.textContent = t("sub.crate"); sub.classList.add("hot"); }
+    else {
+      var nt = Infinity, nl = "";
+      if (!G.miniSpawned && MINI_TIME > G.t){ nt = MINI_TIME; nl = t("sub.miniName"); }
+      if (G.eliteIdx < ELITE_TIMES.length && ELITE_TIMES[G.eliteIdx] < nt){
+        nt = ELITE_TIMES[G.eliteIdx]; nl = t("sub.eliteName");
+      }
+      if (nt < Infinity){
+        sub.textContent = t("sub.next", { what:nl, time:fmtTime(nt - G.t) });
+        sub.classList.remove("hot");
+      } else { sub.textContent = t("sub.last"); sub.classList.add("hot"); }
+    }
+
+    if (br){
+      $("bosswrap").hidden = false;
+      $("bossfill").style.transform = "scaleX(" + Math.max(0, br.hp / br.maxhp) + ")";
+    } else $("bosswrap").hidden = true;
+
+    syncWeaponUI();
+  }
+  function syncWeaponUI(){
+    if (!G) return;
+    var i = G.player.wi, ws = wstat(i), w = WEAPONS[i], g = G.guns[i];
+    $("w-name").textContent = w.name;
+    $("btn-swap-n").textContent = String(((i + 1) % WEAPONS.length) + 1);
+    $("w-turn").textContent = Math.round(ws.turn) + "°/s";
+    $("w-half").textContent = dec(180 / ws.turn, 2) + " s";
+    // DPS thực tế phải cộng cả thời gian thay đạn, nếu không băng 1 viên sẽ hiện con số vô nghĩa
+    var effRate = ws.rate + ws.reload / Math.max(1, ws.mag);
+    $("w-dps").textContent = Math.round(ws.dmg * ws.pellets * ws.lines / effRate);
+    var ready = ws.steady && G.player.stillT >= STEADY_AFTER;
+    $("w-steadyl").hidden = !ws.steady;
+    $("w-steady").hidden = !ws.steady;
+    if (ws.steady){
+      $("w-steady").textContent = ready
+        ? t("wpn.steadyReady", { m:dec(ws.steady, 1) })
+        : t("wpn.steadyMoving");
+      $("w-steady").style.color = ready ? "#cfe8ff" : "";
+    }
+    var reloading = g.reloadT > 0;
+    $("ammowrap").classList.toggle("reloading", reloading);
+    $("w-ammo").textContent = reloading ? t("wpn.reloading") : g.ammo + " / " + ws.mag;
+    var frac = reloading ? 1 - g.reloadT / ws.reload : g.ammo / ws.mag;
+    $("ammofill").style.transform = "scaleX(" + Math.max(0, Math.min(1, frac)) + ")";
+    var rows = $("wtbody").children;
+    for (var r = 0; r < rows.length; r++) rows[r].classList.toggle("sel", r === i);
+  }
+  function buildTable(){
+    var tb = $("wtbody");
+    tb.innerHTML = "";
+    WEAPONS.forEach(function(w, i){
+      var tr = document.createElement("tr");
+      for (var c = 0; c < 5; c++) tr.appendChild(document.createElement("td"));
+      var turn = w.turn * T.turnMul;
+      tr.children[0].textContent = w.name;
+      tr.children[1].textContent = Math.round(turn) + "°/s";
+      tr.children[2].textContent = dec(180 / turn, 2) + "s";
+      tr.children[3].textContent = w.dps;
+      tr.children[4].textContent = w.range;
+      tr.style.cursor = "pointer";
+      tr.addEventListener("click", function(){ setWeapon(i); });
+      tb.appendChild(tr);
+    });
+    syncWeaponUI();
+  }
+
+  // ================================================================ panel
+  function bindRange(id, key, fmt, after){
+    var el = $(id), out = $(id.replace("s-", "o-"));
+    el.value = T[key];
+    function apply(){
+      T[key] = parseFloat(el.value);
+      out.textContent = fmt(T[key]);
+      saveTune();
+      if (after) after();
+    }
+    el.addEventListener("input", apply);
+    apply();
+  }
+  function bindTog(id, key){
+    var el = $(id);
+    el.checked = !!T[key];
+    el.addEventListener("change", function(){ T[key] = el.checked; saveTune(); });
+  }
+  function refreshNotes(){
+    $("n-turn").textContent = t("panel.turnNote", {
+      a: dec(180 / (180 * T.turnMul), 2), b: dec(180 / (600 * T.turnMul), 2) });
+    $("n-arc").textContent = T.frontArc >= 350
+      ? t("panel.arc360")
+      : t("panel.arcNote", { deg:T.frontArc });
+    $("n-pspd").textContent = t("panel.pspeedNote", {
+      r: Math.round(105 * T.zspeed), w: Math.round(52 * T.zspeed) });
+    $("n-xpc").textContent = t("panel.xpcurveNote", {
+      a: xpForLevel(1), b: xpForLevel(5), c: xpForLevel(15), d: xpForLevel(25) });
+    buildTable();
+  }
+
+  bindRange("s-time", "timeScale", function(v){ return dec(v, 1) + "×"; });
+  bindRange("s-turn", "turnMul", function(v){ return dec(v, 2) + "×"; }, refreshNotes);
+  bindRange("s-arc", "frontArc", function(v){ return Math.round(v) + "°"; }, refreshNotes);
+  bindRange("s-lead", "lead", function(v){ return Math.round(v * 100) + "%"; });
+  bindRange("s-dens", "density", function(v){ return dec(v, 2) + "×"; });
+  bindRange("s-pspd", "pspeed", function(v){ return Math.round(v) + " px/s"; }, refreshNotes);
+  bindRange("s-zspd", "zspeed", function(v){ return dec(v, 2) + "×"; }, refreshNotes);
+  bindRange("s-flank", "flank", function(v){ return Math.round(v * 100) + "%"; });
+  bindRange("s-xpc", "xpCurve", function(v){ return dec(v, 2) + "×"; }, refreshNotes);
+  bindRange("s-arena", "arenaR", function(v){ return Math.round(v) + " px"; });
+
+  // chọn khu vực: hôm nay chỉ đổi bảng màu và vật trang trí, sau này đổi cả ảnh nền và bộ da zombie
+  function setTheme(k){
+    if (!THEMES[k]) return;
+    T.theme = k; saveTune();
+    ["farm","war","city"].forEach(function(n){ $("th-" + n).classList.toggle("on", n === k); });
+  }
+  ["farm","war","city"].forEach(function(k){
+    $("th-" + k).addEventListener("click", function(){ setTheme(k); });
+  });
+  setTheme(T.theme);
+  bindTog("t-rear", "rearFire"); bindTog("t-cone", "showCone");
+  bindTog("t-sound", "sound"); bindTog("t-shake", "shake"); bindTog("t-god", "god");
+
+  var RANGES = [["s-time","timeScale"],["s-turn","turnMul"],["s-arc","frontArc"],["s-lead","lead"],
+                ["s-dens","density"],["s-pspd","pspeed"],["s-zspd","zspeed"],["s-flank","flank"],
+                ["s-xpc","xpCurve"],["s-arena","arenaR"]];
+  var TOGS = [["t-rear","rearFire"],["t-cone","showCone"],["t-sound","sound"],["t-shake","shake"],["t-god","god"]];
+
+  $("btn-reset").addEventListener("click", function(){
+    for (var rk in DEF) T[rk] = DEF[rk];
+    saveTune();
+    RANGES.forEach(function(pr){ $(pr[0]).value = T[pr[1]]; $(pr[0]).dispatchEvent(new Event("input")); });
+    TOGS.forEach(function(pr){ $(pr[0]).checked = T[pr[1]]; });
+    setTheme(T.theme);
+    refreshNotes();
+  });
+
+  $("d-elite").addEventListener("click", function(){
+    if (!G || G.state === "dead" || G.state === "win") return;
+    spawnElite(G.eliteIdx < ELITE_TIMES.length ? G.eliteIdx : ELITES.length - 1);
+    if (G.eliteIdx < ELITE_TIMES.length) G.eliteIdx++;
+  });
+  $("d-boss").addEventListener("click", function(){
+    if (!G || G.miniSpawned || G.state === "dead" || G.state === "win") return;
+    spawnMini();
+  });
+  $("d-uniq").addEventListener("click", function(){
+    if (!G || G.unique || G.state === "dead" || G.state === "win") return;
+    queuePick("unique");
+  });
+  $("d-lvlup").addEventListener("click", function(){
+    if (!G || G.state === "dead" || G.state === "win") return;
+    queuePick("level"); queuePick("level"); queuePick("level");
+  });
+  $("d-heal").addEventListener("click", function(){ if (G) G.player.hp = G.player.maxhp; });
+  $("d-mainboss").addEventListener("click", function(){
+    if (!G || G.bossSpawned || G.state === "dead" || G.state === "win") return;
+    spawnBoss();
+  });
+  // thả một cái hộp thật ở xa, để xem mũi tên điều hướng quanh nhân vật chỉ đường
+  $("d-cratefar").addEventListener("click", function(){
+    if (!G || G.state === "dead" || G.state === "win") return;
+    var a = Math.random() * 6.283, d = 300;
+    G.crates.push({ x:G.player.x + Math.cos(a) * d, y:G.player.y + Math.sin(a) * d, t:0 });
+  });
+  $("d-crate").addEventListener("click", function(){
+    if (!G || G.state === "dead" || G.state === "win") return;
+    queuePick("crate");
+  });
+
+  function restart(){
+    ["ov-dead","ov-win","ov-pick","ov-pause"].forEach(function(id){ $(id).classList.remove("on"); });
+    $("bosswrap").hidden = true;
+    $("arenamsg").hidden = true;
+    panelPaused = false;
+    newGame(); resize();
+  }
+  $("btn-retry").addEventListener("click", restart);
+  $("btn-again").addEventListener("click", restart);
+  $("btn-restart").addEventListener("click", function(){ restart(); $("panel").classList.remove("open"); });
+  $("btn-resume").addEventListener("click", togglePause);
+  $("paneltoggle").addEventListener("click", function(){
+    var open = $("panel").classList.toggle("open");
+    if (!G || G.state === "dead" || G.state === "win" || G.state === "pick") return;
+    if (open){
+      if (G.state === "play"){ G.state = "pause"; panelPaused = true; }
+    } else if (panelPaused && G.state === "pause"){
+      resumePlay();
+    }
+  });
+  $("btn-start").addEventListener("click", function(){
+    actx(); $("ov-start").classList.remove("on"); started = true;
+  });
+
+  // ================================================================ loop
+  var started = false, last = 0;
+  function frame(ts){
+    requestAnimationFrame(frame);
+    var raw = last ? Math.min(0.05, (ts - last) / 1000) : 0.016;
+    last = ts;
+    fpsAcc += raw; fpsN++;
+    if (fpsAcc > 0.5){ $("c-fps").textContent = Math.round(fpsN / fpsAcc); fpsAcc = 0; fpsN = 0; }
+
+    if (!G) return;
+    if (started && G.state === "play"){
+      var scale = T.timeScale;
+      var steps = Math.min(5, Math.ceil(scale));
+      for (var i = 0; i < steps && G.state === "play"; i++) update(raw * scale / steps);
+    }
+    // giảm dần theo khung hình vẽ chứ không theo bước mô phỏng, nếu không màn hình chết
+    // và màn hình tạm dừng sẽ đứng nguyên ở mức rung và ánh đỏ cao nhất
+    G.shake *= Math.pow(0.0015, raw);
+    G.flash = Math.max(0, G.flash - raw * 3.2);
+    draw();
+  }
+
+  // ================================================================ hook kiểm thử
+  // Cửa sổ chỉ-đọc nhìn vào trạng thái trận đấu, đủ để chơi game mà không cần nhìn màn hình.
+  // Kịch bản Playwright đọc cái này để đối chiếu với ảnh chụp. Không có tác dụng gì trong game.
+  window.render_game_to_text = function(){
+    if (!G) return JSON.stringify({ mode:"boot" });
+    var p = G.player, ws = wstat(p.wi), gun = G.guns[p.wi];
+    var l = view.left, tp = view.top, vw = view.vw, vh = view.vh;
+    function onScreen(e, pad){
+      var q = pad || 0;
+      return e.x >= l - q && e.x <= l + vw + q && e.y >= tp - q && e.y <= tp + vh + q;
+    }
+    function rel(e){ return [Math.round(e.x - p.x), Math.round(e.y - p.y)]; }
+    var vis = [], off = 0;
+    G.zombies.forEach(function(z){
+      if (z.dead) return;
+      if (onScreen(z, 40)) vis.push({ k:z.kind || z.type, at:rel(z), hp:Math.round(z.hp) });
+      else off++;
+    });
+    return JSON.stringify({
+      axes:"toạ độ at[] là tương đối so với nhân vật: +x sang phải, +y xuống dưới; nhân vật luôn ở giữa màn hình",
+      mode:G.state, started:started, t:Math.round(G.t), lvl:G.lvl, xp:[Math.round(G.xp), G.xpNext],
+      kills:G.kills, gold:G.gold, lang:LANG,
+      player:{ world:[Math.round(p.x), Math.round(p.y)], hp:Math.round(p.hp), maxhp:Math.round(p.maxhp),
+               aimDeg:Math.round(p.a * 180 / Math.PI), r:Math.round(p.r), shield:p.shieldUp },
+      weapon:{ id:WEAPONS[p.wi].id, ammo:gun.ammo, mag:ws.mag, reloading:gun.reloadT > 0,
+               lines:ws.lines, dmg:Math.round(ws.dmg), range:Math.round(ws.range) },
+      view:{ w:Math.round(vw), h:Math.round(vh) },
+      target:G.target && !G.target.dead ? { at:rel(G.target), rear:G.rearLock } : null,
+      zombies:{ onScreen:vis.length, offScreen:off, list:vis.slice(0, 24) },
+      crates:G.crates.map(function(c){ return { at:rel(c), unique:!!c.unique, onScreen:onScreen(c) }; }),
+      items:G.items.filter(function(it){ return it.kind !== "gold"; })
+                   .map(function(it){ return { k:it.kind, at:rel(it), onScreen:onScreen(it) }; }),
+      arena:G.arena ? { at:rel(G.arena), r:Math.round(G.arena.r), phase:G.arena.phase,
+                        t:Math.round(G.arena.t * 10) / 10 } : null,
+      boss:G.bossRef && !G.bossRef.dead
+        ? { kind:G.bossRef.kind, at:rel(G.bossRef), hp:Math.round(G.bossRef.hp),
+            maxhp:G.bossRef.maxhp, phase:G.bossRef.phase } : null,
+      waves:G.waves.map(function(wv){ return Math.round(wv.r); }),
+      orbs:G.orbs.length, bullets:G.bullets.length,
+      up:G.up, unique:G.unique, adv:G.adv,
+      pick:G.state === "pick" && G.curPick ? { type:G.curPick.type, opts:G.curPick.opts } : null
+    });
+  };
+
+  applyI18n();
+  resize(); newGame(); buildTable(); refreshNotes();
+  requestAnimationFrame(frame);
+
+  try {
+    if (window.claude && window.claude.hot){
+      window.claude.hot.snapshot(function(){ return { tune:T }; });
+      var boot = window.claude.hot.data;
+      if (boot && boot.tune) for (var bk in boot.tune) if (bk in T) T[bk] = boot.tune[bk];
+    }
+  } catch(e){}
+})();
+</script>
