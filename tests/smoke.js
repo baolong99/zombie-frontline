@@ -123,7 +123,7 @@ const probed = code.replace(/\}\)\(\);\s*$/,
   " t:Math.round(G.t), kills:G.kills, uni:G.unique, state:G.state," +
   " pending:G.pending.length, pick:G.curPick && G.curPick.type," +
   " opts:G.curPick && G.curPick.opts, bossSpawned:G.bossSpawned," +
-  " bossAfter:G.bossAfterPick, arena:!!G.arena, adv:G.adv, up:G.up }; };\n})();");
+  " arena:!!G.arena, adv:G.adv, up:G.up }; };\n})();");
 if (probed === code) { console.log("probe injection failed"); process.exit(1); }
 
 vm.createContext(sandbox);

@@ -57,14 +57,17 @@ console.log("sau khi hạ trùm phụ: boss=" + JSON.stringify(s.boss) + " arena
             " unique=" + s.unique);
 
 // ---- elite phút 10: bấm cho tới con cuối
+// Nạp sẵn nâng cấp cho bot. Với cây node thì người chơi yếu hơn hệ 5 cấp cũ nhiều, bot mà
+// tay không thì không hạ nổi 5 con elite trong thời lượng bài kiểm.
 await page.$eval("#s-time", el => { el.value = "1"; el.dispatchEvent(new Event("input")); });
+for (let i = 0; i < 4; i++){ await tap("#d-lvlup"); await page.waitForTimeout(120); await clearPicks(); }
 for (let i = 0; i < 5; i++){ await tap("#d-elite"); await page.waitForTimeout(110); }
 s = await state();
 console.log("5 elite đã gọi, arena=" + JSON.stringify(s.arena) + " (phải là null)");
 
 // hạ hết elite rồi nhặt hộp cuối -> trùm chính phải hiện ra
 await page.$eval("#s-time", el => { el.value = "5"; el.dispatchEvent(new Event("input")); });
-for (let i = 0; i < 140; i++){
+for (let i = 0; i < 260; i++){
   await wait(400);
   s = await state();
   if (s.boss && s.boss.kind === "boss") break;

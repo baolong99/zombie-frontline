@@ -937,7 +937,8 @@
       shake:0, flash:0, leechAcc:0,
       lvl:1, xp:0, xpNext:xpForLevel(1),
       adv:0, advByGroup:{}, eliteIdx:0, miniSpawned:false, mini:null, arena:null,
-      boss:null, bossSpawned:false, bossAfterPick:false, bossRef:null, bossKey:"",
+      boss:null, bossSpawned:false, bossRef:null, bossKey:"",
+      spawnDone:false, props:[], propKey:"",
       unique:null,
       target:null, rearLock:false,
       pending:[], curPick:null,
@@ -1184,6 +1185,12 @@
     // người chơi thì sắp bị nhốt vào trong. Kéo hết về, coi như một cú nam châm miễn phí.
     G.orbs.forEach(function(o){ o.homing = true; });
     G.items.forEach(function(it){ it.homing = true; });
+    // Hộp không tự bay được, mà nằm ngoài tường thì mất luôn phần thưởng — kéo nó vào trong.
+    G.crates.forEach(function(c){
+      var dx = c.x - G.arena.x, dy = c.y - G.arena.y, d = Math.hypot(dx, dy);
+      var lim = G.arena.rTo - 70;
+      if (d > lim && d > 0){ c.x = G.arena.x + dx / d * lim; c.y = G.arena.y + dy / d * lim; }
+    });
     G.flash = 1;
     if (T.shake) G.shake = 14;
     ring(p.x, p.y, T.arenaR, "rgba(255,70,60,.9)");
@@ -1483,7 +1490,10 @@
 
     if (z.elite){
       G.crates.push({ x:z.x, y:z.y, t:0, last:!!z.last });
-      if (z.last) G.arena = null;        // hạ trùm cuối là vòng vây tan
+      // Hạ elite phút thứ 10 là sân ngừng đẻ quái hẳn và trùm chính bước ra ngay lập tức.
+      // Hộp của con elite này vẫn rơi và vẫn nhặt được trong lúc đếm ngược — startArena()
+      // kéo nó vào trong vòng vây để nó không nằm ngoài tường.
+      if (z.last){ G.spawnDone = true; spawnBoss(); }
 
       if (T.shake) G.shake = 10;
       if (z.kind === "splitter")
@@ -1565,8 +1575,8 @@
     }
     var r = Math.random();
     if (r < 0.14) addItem(z.x, z.y, "gold", 1 + Math.floor(Math.random() * 3));
-    else if (r < 0.145) addItem(z.x, z.y, "hp", 0);        // 0,50%
-    else if (r < 0.155) addItem(z.x, z.y, "magnet", 0);    // 1,00%
+    else if (r < 0.141) addItem(z.x, z.y, "hp", 0);        // 0,10%
+    else if (r < 0.143) addItem(z.x, z.y, "magnet", 0);    // 0,20%
   }
 
   // ================================================================ upgrades
@@ -1750,15 +1760,6 @@
     renderUpStack();
     updateHUD();
     blip(700, 0.1, "triangle", 0.05);
-    // Nhặt xong hộp của elite phút thứ 10 là trùm chính bước ra. Phải đợi chọn hết hàng chờ
-    // đã, nếu không nghi thức vòng vây sẽ chạy phía sau một cái menu đang mở.
-    if (!G.pending.length && G.bossAfterPick){
-      G.bossAfterPick = false;
-      G.state = "play";
-      $("ov-pick").classList.remove("on");
-      spawnBoss();
-      return;
-    }
     openNextPick();
   }
 
@@ -1921,6 +1922,8 @@
       p.moveA = Math.atan2(inp.y, inp.x);   // hướng chạy quyết định phần lớn quái sinh ra ở đâu
     }
     p.x += mx * dt; p.y += my * dt;   // vô tận: không kẹp biên nữa
+    rebuildProps();
+    pushOutOfProps(p, p.r);
     if (G.arena) clampToArena(p, p.r);
     p.ft += dt;
     p.anim = inp.m > 0 ? "walk" : "idle";
@@ -1958,8 +1961,8 @@
     G.spawnT -= dt;
     if (G.spawnT <= 0){
       G.spawnT = Math.max(0.24, 1.15 - (G.t / LEVEL_TIME) * 0.85) / Math.max(0.4, T.density);
-      // trong vòng vây trùm cuối thì ngừng nhỏ giọt: đó là một trận tay đôi, không phải đám đông
-      if (alive < cap && !G.arena){
+      // Ngừng nhỏ giọt khi đang trong vòng vây (trận tay đôi) và sau khi elite phút 10 ngã
+      if (alive < cap && !G.arena && !G.spawnDone){
         // Vòng sinh nằm ngoài tầm nhìn nên quái đi bộ mất gần gấp đôi thời gian mới tới nơi
         // so với hồi sinh ở rìa sân cũ. Đẻ theo chỗ trống còn lại thay vì theo đồng hồ, để
         // "Mật độ zombie" lại đúng là thứ quyết định đám đông đông tới đâu.
@@ -2079,6 +2082,9 @@
         p.x -= dx / d * 6; p.y -= dy / d * 6;
         if (!z.elite && z.kind !== "mini" && z.kind !== "boss"){ z.x += dx / d * 8; z.y += dy / d * 8; }
       }
+      // Quái thường bị vật cản chặn và trượt dọc theo nó. Elite và trùm thì húc thẳng qua —
+      // để chúng kẹt sau một cuộn rơm thì trận đấu hỏng hẳn, mà cũng đúng chất của chúng.
+      if (!z.elite && z.kind !== "mini" && z.kind !== "boss") pushOutOfProps(z, z.r);
       if (G.arena) clampToArena(z, z.r);
       // Bị bỏ xa quá thì dời ra rìa vòng sinh thay vì xoá: giữ nguyên áp lực đám đông
       // mà không để quái bị bỏ rơi chiếm chỗ trong giới hạn số quái sống.
@@ -2127,6 +2133,11 @@
           if (T.shake) G.shake = Math.min(11, G.shake + 1.4);
           continue;
         }
+        G.bullets.splice(bi, 1); continue;
+      }
+      // đâm vào vật chắn cứng thì tắt tại chỗ — cuộn rơm, xác xe, xe hơi
+      if (shotBlocked(b.x, b.y, b.rad)){
+        spark(b.x, b.y, 4, "rgba(220,200,150,.85)", 110, 0.26);
         G.bullets.splice(bi, 1); continue;
       }
       for (var zj = 0; zj < zs.length; zj++){
@@ -2203,6 +2214,7 @@
         it.x += idx / idd * it.sp * dt; it.y += idy / idd * it.sp * dt;
       } else {
         it.x += it.vx * dt; it.y += it.vy * dt; it.vx *= 0.88; it.vy *= 0.88;
+        pushOutOfProps(it, 26);   // bình máu và nam châm cũng không được nằm trong vật cản
       }
       if (idd < p.r + 22){
         if (it.kind === "hp"){
@@ -2226,11 +2238,13 @@
     for (var ci = G.crates.length - 1; ci >= 0; ci--){
       var cr = G.crates[ci];
       cr.t += dt;
+      // Hộp rơi trúng giữa cuộn rơm thì người chơi bị đẩy ra xa hơn tầm nhặt và mất luôn
+      // phần thưởng. Đẩy hộp ra ngoài vật cản, dùng bán kính rộng hơn tầm nhặt một chút.
+      pushOutOfProps(cr, 30);
       if (Math.hypot(p.x - cr.x, p.y - cr.y) < p.r + 22){
         G.crates.splice(ci, 1);
         blip(520, 0.14, "triangle", 0.06);
         blip(780, 0.16, "triangle", 0.05);
-        if (cr.last) G.bossAfterPick = true;
         queuePick(cr.unique && !G.unique ? "unique" : "crate");
       }
     }
@@ -2361,10 +2375,30 @@
 
   // ---- chủ đề khu vực. Hôm nay prop là hình vẽ tay; khi có art thì thay drawProp bằng
   // drawImage và thêm trường ground là ảnh lát nền liền mạch 256×256.
+  // Mỗi khu vực có ba loại vật trang trí, và chúng KHÔNG chỉ để nhìn:
+  //   solid = chặn người chơi và zombie thường    shot = chặn luôn đường đạn
+  // Quy tắc thiết kế: mỗi khu vực đúng một vật chặn cả đạn, một vật chỉ chặn đi lại, một vật
+  // thuần trang trí. Vì game ngắm tự động nên vật chặn đạn mà nhiều thì người chơi ức chế —
+  // họ không tự chọn được góc bắn né vật cản.
+  // shape: "circle" bán kính r×s, hoặc "cap" đoạn thẳng dài ±len×s dày r×s theo góc xoay.
+  // Thứ tự trong mảng là CỐ ĐỊNH ở mọi khu vực, vì tỉ lệ bắt gặp gắn với chỉ số:
+  //   [0] chặn cả đạn (hiếm)   [1] thuần trang trí (hay gặp)   [2] chỉ chặn đi lại
   var THEMES = {
-    farm: { g0:"#1e2a18", g1:"#0e1410", grid:"rgba(255,255,255,.028)", ground:"", props:3 },
-    war:  { g0:"#2a2418", g1:"#14110c", grid:"rgba(255,220,160,.030)", ground:"", props:3 },
-    city: { g0:"#191d24", g1:"#0b0d11", grid:"rgba(180,210,255,.034)", ground:"", props:3 }
+    farm: { g0:"#1e2a18", g1:"#0e1410", grid:"rgba(255,255,255,.028)", ground:"", prop:[
+      { solid:true,  shot:true,  shape:"circle", r:0.46 },              // cuộn rơm
+      { solid:false, shot:false },                                      // luống cày
+      { solid:true,  shot:false, shape:"cap", len:0.95, r:0.11 }        // hàng rào
+    ]},
+    war:  { g0:"#2a2418", g1:"#14110c", grid:"rgba(255,220,160,.030)", ground:"", prop:[
+      { solid:true,  shot:true,  shape:"circle", r:0.58 },              // xác xe
+      { solid:false, shot:false },                                      // hố đạn
+      { solid:true,  shot:false, shape:"cap", len:0.5, r:0.19 }         // ụ bao cát
+    ]},
+    city: { g0:"#191d24", g1:"#0b0d11", grid:"rgba(180,210,255,.034)", ground:"", prop:[
+      { solid:true,  shot:true,  shape:"circle", r:0.60 },              // xe bỏ lại
+      { solid:false, shot:false },                                      // nắp cống
+      { solid:true,  shot:false, shape:"cap", len:0.95, r:0.11 }        // dải phân cách
+    ]}
   };
   function theme(){ return THEMES[T.theme] || THEMES.farm; }
 
@@ -2374,23 +2408,25 @@
   function drawProp(th, idx, s, rot){
     ctx.rotate(rot);
     if (T.theme === "war"){
-      if (idx === 0){                                    // ụ bao cát
-        ctx.fillStyle = "rgba(96,86,58,.5)";
-        for (var i = 0; i < 3; i++){
-          ctx.beginPath();
-          ctx.ellipse(-s * 0.4 + i * s * 0.4, i % 2 ? -s * 0.16 : 0, s * 0.3, s * 0.17, 0, 0, 6.283);
-          ctx.fill();
-        }
+      if (idx === 0){                                    // xác xe — chặn cả đạn
+        ctx.fillStyle = "rgba(70,72,66,.55)";
+        ctx.beginPath(); ctx.ellipse(0, 0, s * 0.62, s * 0.5, 0, 0, 6.283); ctx.fill();
+        ctx.fillStyle = "rgba(20,22,20,.6)";
+        ctx.fillRect(-s * 0.3, -s * 0.24, s * 0.7, s * 0.48);
+        ctx.strokeStyle = "rgba(120,80,40,.4)"; ctx.lineWidth = s * 0.05;
+        ctx.beginPath(); ctx.ellipse(0, 0, s * 0.62, s * 0.5, 0, 0, 6.283); ctx.stroke();
       } else if (idx === 1){                             // hố đạn
         ctx.fillStyle = "rgba(0,0,0,.30)";
         ctx.beginPath(); ctx.ellipse(0, 0, s, s * 0.66, 0, 0, 6.283); ctx.fill();
         ctx.strokeStyle = "rgba(120,100,70,.22)"; ctx.lineWidth = s * 0.14;
         ctx.beginPath(); ctx.ellipse(0, 0, s * 0.96, s * 0.63, 0, 0, 6.283); ctx.stroke();
-      } else {                                           // xác xe
-        ctx.fillStyle = "rgba(70,72,66,.42)";
-        ctx.fillRect(-s * 0.8, -s * 0.34, s * 1.6, s * 0.68);
-        ctx.fillStyle = "rgba(20,22,20,.5)";
-        ctx.fillRect(-s * 0.3, -s * 0.24, s * 0.7, s * 0.48);
+      } else {                                           // ụ bao cát — bắn qua được
+        ctx.fillStyle = "rgba(96,86,58,.55)";
+        for (var i = 0; i < 3; i++){
+          ctx.beginPath();
+          ctx.ellipse(-s * 0.4 + i * s * 0.4, i % 2 ? -s * 0.14 : 0, s * 0.28, s * 0.18, 0, 0, 6.283);
+          ctx.fill();
+        }
       }
     } else if (T.theme === "city"){
       if (idx === 0){                                    // xe hơi bỏ lại
@@ -2403,9 +2439,13 @@
         ctx.beginPath(); ctx.arc(0, 0, s * 0.42, 0, 6.283); ctx.fill();
         ctx.strokeStyle = "rgba(150,160,175,.18)"; ctx.lineWidth = s * 0.06;
         ctx.beginPath(); ctx.arc(0, 0, s * 0.42, 0, 6.283); ctx.stroke();
-      } else {                                           // vạch kẻ đường
-        ctx.fillStyle = "rgba(226,222,186,.20)";
-        for (var d = 0; d < 3; d++) ctx.fillRect(-s + d * s * 0.85, -s * 0.07, s * 0.55, s * 0.14);
+      } else {                                           // dải phân cách bê tông
+        ctx.fillStyle = "rgba(196,198,190,.34)";
+        ctx.fillRect(-s * 0.95, -s * 0.13, s * 1.9, s * 0.26);
+        ctx.fillStyle = "rgba(230,180,60,.26)";
+        for (var d = 0; d < 4; d++) ctx.fillRect(-s * 0.9 + d * s * 0.48, -s * 0.13, s * 0.2, s * 0.26);
+        ctx.strokeStyle = "rgba(40,44,50,.5)"; ctx.lineWidth = s * 0.04;
+        ctx.strokeRect(-s * 0.95, -s * 0.13, s * 1.9, s * 0.26);
       }
     } else {
       if (idx === 0){                                    // cuộn rơm
@@ -2649,6 +2689,90 @@
     var n = Math.sin(i * 127.1 + j * 311.7) * 43758.5453;
     return n - Math.floor(n);
   }
+  // ---- vật cản. Sinh ra từ cùng một hàm băm với lúc vẽ, nên hình nhìn thấy và hình va chạm
+  // không bao giờ lệch nhau, và vẫn không cần lưu gì cả trên bản đồ vô tận.
+  var PROP_GRID = 190;
+  var PROP_CHANCE = 0.42;
+  function propAt(a, b){
+    var hp = hash2(a * 17 + 5, b * 23 - 3);
+    if (hp >= PROP_CHANCE) return null;
+    var px = hash2(a * 41, b * 13), py = hash2(a * 7, b * 29), hs = hash2(a - 9, b + 4);
+    // Chia không đều là cố ý. Ban đầu tôi chia đều ba loại và đo được người chơi chỉ đi
+    // được 40% quãng đường — bản đồ hoá mê cung. Giờ hơn nửa số vật là loại vẽ phẳng
+    // không chặn gì, và loại ăn đạn thì hiếm nhất vì ngắm tự động không né được vật cản.
+    var f = hp / PROP_CHANCE;
+    var idx = f < 0.55 ? 1 : (f < 0.82 ? 2 : 0);
+    return { x:a * PROP_GRID + px * PROP_GRID, y:b * PROP_GRID + py * PROP_GRID,
+             s:30 + hs * 26, rot:(px - 0.5) * 1.2, idx:idx, def:theme().prop[idx] };
+  }
+
+  // Danh sách vật cản quanh người chơi, chỉ dựng lại khi họ đi được nửa ô hoặc đổi khu vực.
+  // Bán kính bằng bán kính thu hồi quái, nên mọi zombie còn sống đều nằm trong danh sách.
+  function rebuildProps(){
+    var p = G.player, R = cullRadius();
+    var key = Math.round(p.x / 95) + "," + Math.round(p.y / 95) + "," + T.theme;
+    if (key === G.propKey) return;
+    G.propKey = key;
+    var out = [];
+    var a0 = Math.floor((p.x - R) / PROP_GRID), a1 = Math.floor((p.x + R) / PROP_GRID);
+    var b0 = Math.floor((p.y - R) / PROP_GRID), b1 = Math.floor((p.y + R) / PROP_GRID);
+    for (var a = a0; a <= a1; a++)
+      for (var b = b0; b <= b1; b++){
+        var pr = propAt(a, b);
+        if (!pr || !pr.def.solid) continue;
+        // bán kính bao, để loại nhanh bằng hộp chữ nhật trước khi tính khoảng cách thật
+        pr.br = (pr.def.shape === "cap" ? pr.def.len + pr.def.r : pr.def.r) * pr.s;
+        out.push(pr);
+      }
+    G.props = out;
+  }
+
+  // khoảng cách từ một điểm tới đoạn thẳng, kèm điểm gần nhất — dùng cho vật cản dạng thanh dài
+  function segNear(px, py, ax, ay, bx, by){
+    var dx = bx - ax, dy = by - ay, L = dx * dx + dy * dy;
+    var t = L > 0 ? ((px - ax) * dx + (py - ay) * dy) / L : 0;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    return { x:ax + dx * t, y:ay + dy * t };
+  }
+  // Tâm va chạm gần nhất của một vật cản so với điểm (x,y), kèm bán kính của nó.
+  function propNear(pr, x, y){
+    var d = pr.def;
+    if (d.shape === "cap"){
+      var c = Math.cos(pr.rot) * d.len * pr.s, s2 = Math.sin(pr.rot) * d.len * pr.s;
+      var q = segNear(x, y, pr.x - c, pr.y - s2, pr.x + c, pr.y + s2);
+      return { x:q.x, y:q.y, r:d.r * pr.s };
+    }
+    return { x:pr.x, y:pr.y, r:d.r * pr.s };
+  }
+  // Đẩy một thực thể ra khỏi mọi vật cản nó đang lún vào. Đẩy theo pháp tuyến nên khi đi xiên
+  // vào tường thì nó trượt dọc theo mặt tường chứ không dính cứng.
+  function pushOutOfProps(e, rad){
+    var ps = G.props;
+    for (var i = 0; i < ps.length; i++){
+      var pr = ps[i], reach = pr.br + rad;
+      if (Math.abs(e.x - pr.x) > reach || Math.abs(e.y - pr.y) > reach) continue;
+      var n = propNear(pr, e.x, e.y), R = n.r + rad;
+      var dx = e.x - n.x, dy = e.y - n.y, d = Math.hypot(dx, dy);
+      if (d >= R) continue;
+      if (d < 0.01){ dx = 1; dy = 0; d = 1; }
+      e.x = n.x + dx / d * R;
+      e.y = n.y + dy / d * R;
+    }
+  }
+  // Đạn có bị vật cản chặn không — chỉ những vật đánh dấu shot mới ăn đạn
+  function shotBlocked(x, y, rad){
+    var ps = G.props;
+    for (var i = 0; i < ps.length; i++){
+      var pr = ps[i];
+      if (!pr.def.shot) continue;
+      var reach = pr.br + rad;
+      if (Math.abs(x - pr.x) > reach || Math.abs(y - pr.y) > reach) continue;
+      var n = propNear(pr, x, y);
+      if (Math.hypot(x - n.x, y - n.y) < n.r + rad) return true;
+    }
+    return false;
+  }
+
   function drawGround(left, top, vw, vh){
     var C = 300, th = theme();
     var i0 = Math.floor(left / C), i1 = Math.floor((left + vw) / C);
@@ -2668,17 +2792,24 @@
     }
     // Vật trang trí của khu vực đi trên một lưới dày hơn lưới vết đất, nếu không cả màn
     // hình chỉ có một hai món và khu vực chẳng còn ra khu vực.
-    var P = 190;
-    var a0 = Math.floor(left / P), a1 = Math.floor((left + vw) / P);
-    var b0 = Math.floor(top / P), b1 = Math.floor((top + vh) / P);
+    var a0 = Math.floor(left / PROP_GRID), a1 = Math.floor((left + vw) / PROP_GRID);
+    var b0 = Math.floor(top / PROP_GRID), b1 = Math.floor((top + vh) / PROP_GRID);
     for (var a = a0; a <= a1; a++){
       for (var b = b0; b <= b1; b++){
-        var hp = hash2(a * 17 + 5, b * 23 - 3);
-        if (hp >= 0.52) continue;
-        var px = hash2(a * 41, b * 13), py = hash2(a * 7, b * 29), hs = hash2(a - 9, b + 4);
+        var pr = propAt(a, b);
+        if (!pr) continue;
+        // Bóng đổ dưới chân vật rắn — đây là tín hiệu duy nhất cho người chơi biết cái này
+        // chặn đường, phân biệt với vệt đất và luống cày vẽ phẳng.
+        if (pr.def.solid && pr.def.shape === "circle"){
+          ctx.fillStyle = "rgba(0,0,0,.34)";
+          ctx.beginPath();
+          ctx.ellipse(pr.x, pr.y + pr.s * 0.18, pr.def.r * pr.s * 1.05, pr.def.r * pr.s * 0.5,
+                      0, 0, 6.283);
+          ctx.fill();
+        }
         ctx.save();
-        ctx.translate(a * P + px * P, b * P + py * P);
-        drawProp(th, Math.floor(hp / 0.52 * th.props) % th.props, 30 + hs * 26, (px - 0.5) * 1.2);
+        ctx.translate(pr.x, pr.y);
+        drawProp(th, pr.idx, pr.s, pr.rot);
         ctx.restore();
       }
     }
