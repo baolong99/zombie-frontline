@@ -33,12 +33,12 @@ CFG = {
     "margin": 1.18,                # nới khung quanh nhân vật, 1.0 là sát khít
 
     # Hoạt cảnh: tên trong game -> (tên action trong Blender, số khung lấy mẫu).
-    # Số khung lấy đều trên toàn bộ độ dài action. Tên action xem ở tab Dope Sheet > Action Editor.
-    "anims": {
-        "walk": ("Walk", 8),
-        "idle": ("Idle", 4),
-        "die":  ("Death", 10),
-    },
+    # Số khung lấy đều trên toàn bộ độ dài action.
+    #
+    # Để RỖNG {} thì script tự dò: nó liệt kê mọi action có trong file và ghép theo từ khoá
+    # (xem AUTO bên dưới). Tiện khi mở một bộ lạ mà chưa biết họ đặt tên action thế nào.
+    # Dù tự dò hay không, script luôn in ra danh sách action đầy đủ để bạn chỉnh lại.
+    "anims": {},
 
     # Mô hình quay mặt về đâu ở tư thế gốc. Nếu render ra mà hàng 0 không phải là quay mặt
     # xuống dưới thì chỉnh số này: thử 180, rồi 90, rồi -90.
@@ -201,6 +201,39 @@ def bind_action(obj, act):
         ad.action_slot = pick
 
 
+# Từ khoá để tự dò hoạt cảnh, xét theo thứ tự — cái đứng trước được ưu tiên.
+# Bỏ qua mấy action rác hay gặp trong FBX như "Targeting Pose", "T-Pose", "Rest".
+AUTO = {
+    "walk": (["walk", "run", "move", "shamble"], 8),
+    "idle": (["idle", "stand"], 4),
+    "die":  (["death", "die", "dead", "fall"], 10),
+    "attack": (["attack", "punch", "bite", "hit", "swing"], 6),
+}
+JUNK = ["targeting", "t-pose", "tpose", "rest", "bind"]
+
+
+def auto_anims():
+    """Ghép action có sẵn trong file vào tên hoạt cảnh của game bằng từ khoá."""
+    names = [a.name for a in bpy.data.actions]
+    print("Action có trong file (%d):" % len(names))
+    for n in names:
+        print("    %s" % n)
+    usable = [n for n in names if not any(j in n.lower() for j in JUNK)]
+    out, taken = {}, set()
+    for game_name, (keys, frames) in AUTO.items():
+        for k in keys:
+            pick = next((n for n in usable if k in n.lower() and n not in taken), None)
+            if pick:
+                out[game_name] = (pick, frames)
+                taken.add(pick)
+                print("  tự dò: %-7s <- '%s'" % (game_name, pick))
+                break
+    if not out and usable:                      # không khớp từ khoá nào thì lấy đại cái đầu
+        out["walk"] = (usable[0], 8)
+        print("  tự dò: không khớp từ khoá nào, dùng tạm '%s' làm walk" % usable[0])
+    return out
+
+
 def action_of(name):
     a = bpy.data.actions.get(name)
     if a is None:
@@ -271,8 +304,12 @@ def main():
     pivot, foot, frac = setup_scene(subject)
     print("foot = %.3f · nhân vật cao %.0f%% chiều cao ô" % (foot, frac * 100))
 
+    want = CFG["anims"] or auto_anims()
+    if not want:
+        raise RuntimeError("Không có action nào để render")
+
     anims = {}
-    for game_name, (action_name, frames) in CFG["anims"].items():
+    for game_name, (action_name, frames) in want.items():
         key = "%s_%s" % (CFG["prefix"], game_name)
         path = os.path.join(out_dir, key + ".png")
         print("Render %s (action '%s', %d khung)..." % (game_name, action_name, frames))
