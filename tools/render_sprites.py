@@ -1,0 +1,246 @@
+# Render sprite sheet 8 hướng từ mô hình 3D, đúng bố cục mà index.html đang chờ.
+#
+#   blender cảnh.blend --background --python tools/render_sprites.py
+#
+# hoặc mở Blender, dán file này vào Scripting rồi bấm Run.
+#
+# Kết quả: mỗi hoạt cảnh một file PNG dạng lưới ô vuông — hàng là hướng quay, cột là khung —
+# cộng một file sprites.json chứa sẵn đoạn khai báo SKIN để dán thẳng vào game.
+#
+# Bốn chỗ hay sai mà script này lo hộ:
+#   1. Góc camera phải khớp LEAN = 0.5 trong game, tức nghiêng đúng 60° so với phương đứng
+#   2. Hàng 0 phải là hướng quay mặt XUỐNG DƯỚI, các hàng sau theo chiều kim đồng hồ
+#   3. Điểm neo foot phải tính ra chứ không đoán, nếu không nhân vật trôi lệch khỏi bóng
+#   4. View transform phải là Standard, để Filmic/AgX không làm nhạt hết màu sprite
+
+import bpy, os, json, math
+import numpy as np
+
+# ============================================================ cấu hình
+CFG = {
+    # thư mục xuất. Để trống thì lấy thư mục chứa file .blend
+    "out_dir": "",
+    "prefix": "z",                 # tiền tố tên file: z_walk.png, z_die.png...
+
+    "dirs": 8,                     # số hàng = số hướng quay
+    "cell": 128,                   # cạnh mỗi ô, pixel. Ô BẮT BUỘC vuông
+    "tilt_deg": 60.0,              # nghiêng so với phương đứng; 60 khớp LEAN 0.5 trong game
+    "margin": 1.18,                # nới khung quanh nhân vật, 1.0 là sát khít
+
+    # Hoạt cảnh: tên trong game -> (tên action trong Blender, số khung lấy mẫu).
+    # Số khung lấy đều trên toàn bộ độ dài action. Tên action xem ở tab Dope Sheet > Action Editor.
+    "anims": {
+        "walk": ("Walk", 8),
+        "idle": ("Idle", 4),
+        "die":  ("Death", 10),
+    },
+
+    # Mô hình quay mặt về đâu ở tư thế gốc. Nếu render ra mà hàng 0 không phải là quay mặt
+    # xuống dưới thì chỉnh số này: thử 180, rồi 90, rồi -90.
+    "facing_offset_deg": 0.0,
+}
+# ============================================================
+
+
+def pick_subject():
+    """Đối tượng sẽ được xoay: ưu tiên armature, không có thì lấy mesh gốc lớn nhất."""
+    arms = [o for o in bpy.data.objects if o.type == "ARMATURE" and o.parent is None]
+    if arms:
+        return arms[0]
+    meshes = [o for o in bpy.data.objects if o.type == "MESH" and o.parent is None]
+    if not meshes:
+        raise RuntimeError("Không thấy armature hay mesh nào trong cảnh")
+    return max(meshes, key=lambda o: max(o.dimensions))
+
+
+def _ancestors(o):
+    out, p = [], o.parent
+    while p:
+        out.append(p)
+        p = p.parent
+    return out
+
+
+def world_bounds(root):
+    """Hộp bao của mọi mesh thuộc root (kể cả con cháu), trong toạ độ thế giới."""
+    from mathutils import Vector
+    objs = [o for o in bpy.data.objects
+            if o.type == "MESH" and (o is root or root in _ancestors(o))]
+    if not objs:                                   # mô hình rời, không gắn vào armature
+        objs = [o for o in bpy.data.objects if o.type == "MESH"]
+    if not objs:
+        raise RuntimeError("Không thấy mesh nào để đo kích thước")
+    lo = [1e9, 1e9, 1e9]
+    hi = [-1e9, -1e9, -1e9]
+    for o in objs:
+        for c in o.bound_box:
+            w = o.matrix_world @ Vector(c)
+            for i in range(3):
+                lo[i] = min(lo[i], w[i])
+                hi[i] = max(hi[i], w[i])
+    return lo, hi
+
+
+def setup_scene(subject):
+    sc = bpy.context.scene
+
+    # --- màu: Standard, nếu không Filmic/AgX sẽ làm nhạt và bệt hết sprite
+    sc.view_settings.view_transform = "Standard"
+    sc.view_settings.look = "None"
+
+    # --- nền trong suốt, game tự vẽ bóng nên không render bóng đổ xuống đất
+    sc.render.film_transparent = True
+    sc.render.image_settings.file_format = "PNG"
+    sc.render.image_settings.color_mode = "RGBA"
+    sc.render.resolution_x = CFG["cell"]
+    sc.render.resolution_y = CFG["cell"]
+    sc.render.resolution_percentage = 100
+
+    lo, hi = world_bounds(subject)
+    height = hi[2] - lo[2]
+    width = max(hi[0] - lo[0], hi[1] - lo[1])
+    tilt = math.radians(CFG["tilt_deg"])
+
+    # Chiều cao chiếu lên khung ảnh bị nén theo sin(nghiêng), bề ngang thì không.
+    # Lấy chiều lớn hơn làm khung để nhân vật không bị cắt ở hướng nào cả.
+    span = max(width, height * math.sin(tilt)) * CFG["margin"]
+
+    # --- camera trực giao, ngắm vào giữa thân nhân vật
+    cam_data = bpy.data.cameras.new("SpriteCam")
+    cam_data.type = "ORTHO"
+    cam_data.ortho_scale = span
+    cam = bpy.data.objects.new("SpriteCam", cam_data)
+    sc.collection.objects.link(cam)
+
+    target_z = lo[2] + height * 0.5
+    dist = max(10.0, height * 6)
+    # Camera nghiêng quanh trục X: 0° là nhìn thẳng từ đỉnh xuống, 90° là nhìn ngang.
+    cam.rotation_euler = (tilt, 0.0, 0.0)
+    cam.location = (0.0, -math.sin(tilt) * dist, target_z + math.cos(tilt) * dist)
+    sc.camera = cam
+
+    # --- đèn đặt cố định trong thế giới. Camera đứng yên và chỉ mô hình xoay, nên đèn cố
+    # định trong thế giới CHÍNH LÀ đèn cố định so với camera: cả 8 hướng sáng như nhau.
+    for name, loc, energy, size in [
+        ("Key",  (-4,  -6,  8), 5.0, 6.0),
+        ("Fill", ( 5,  -4,  3), 1.6, 8.0),
+        ("Rim",  ( 0,   6,  5), 2.4, 5.0),
+    ]:
+        d = bpy.data.lights.new(name, type="AREA")
+        d.energy = energy * max(1.0, height) ** 2
+        d.size = size
+        o = bpy.data.objects.new(name, d)
+        o.location = loc
+        # chĩa về giữa nhân vật
+        dx, dy, dz = -loc[0], -loc[1], target_z - loc[2]
+        o.rotation_euler = (math.atan2(math.hypot(dx, dy), -dz), 0.0, math.atan2(dy, dx) + math.pi / 2)
+        sc.collection.objects.link(o)
+
+    # --- foot: điểm chạm đất nằm ở đâu trong ô, tính từ đỉnh ô
+    # Khung ngắm vào target_z. Điểm z=0 nằm thấp hơn tâm khung một đoạn target_z*sin(nghiêng).
+    foot = 0.5 + (target_z * math.sin(tilt)) / span
+    # tỉ lệ chiều cao nhân vật so với chiều cao ô, để suy ra hMul
+    frac = (height * math.sin(tilt)) / span
+    return cam, foot, frac
+
+
+def action_of(name):
+    a = bpy.data.actions.get(name)
+    if a is None:
+        have = ", ".join(sorted(x.name for x in bpy.data.actions)) or "(không có action nào)"
+        raise RuntimeError("Không thấy action '%s'. Các action đang có: %s" % (name, have))
+    return a
+
+
+def render_sheet(subject, game_name, action_name, frames, out_path):
+    sc = bpy.context.scene
+    act = action_of(action_name)
+    if subject.animation_data is None:
+        subject.animation_data_create()
+    subject.animation_data.action = act
+
+    f0, f1 = act.frame_range
+    dirs = CFG["dirs"]
+    cell = CFG["cell"]
+    sheet = np.zeros((dirs * cell, frames * cell, 4), dtype=np.float32)
+
+    base_z = subject.rotation_euler.z
+    tmp = os.path.join(CFG["_out"], "_tmp.png")
+
+    for row in range(dirs):
+        # Hàng 0 quay mặt xuống dưới, các hàng sau theo chiều kim đồng hồ trên màn hình.
+        # Trên màn hình chiều kim đồng hồ ứng với xoay ÂM quanh trục Z trong Blender.
+        subject.rotation_euler.z = base_z \
+            - row * (2 * math.pi / dirs) + math.radians(CFG["facing_offset_deg"])
+
+        for col in range(frames):
+            # lấy mẫu đều trên toàn bộ action; khung cuối không trùng khung đầu với vòng lặp
+            t = col / frames if game_name != "die" else (col / max(1, frames - 1))
+            sc.frame_set(int(round(f0 + (f1 - f0) * t)))
+
+            sc.render.filepath = tmp
+            bpy.ops.render.render(write_still=True)
+
+            img = bpy.data.images.load(tmp)
+            buf = np.empty(cell * cell * 4, dtype=np.float32)
+            img.pixels.foreach_get(buf)
+            bpy.data.images.remove(img)
+
+            # Blender xếp pixel từ DƯỚI lên, sprite sheet của game xếp từ TRÊN xuống,
+            # nên hàng row phải ghi vào vị trí (dirs-1-row) trong bộ đệm.
+            y0 = (dirs - 1 - row) * cell
+            sheet[y0:y0 + cell, col * cell:(col + 1) * cell] = buf.reshape(cell, cell, 4)
+
+    subject.rotation_euler.z = base_z
+    if os.path.exists(tmp):
+        os.remove(tmp)
+
+    out = bpy.data.images.new("sheet", frames * cell, dirs * cell, alpha=True)
+    out.pixels.foreach_set(sheet.ravel())
+    out.filepath_raw = out_path
+    out.file_format = "PNG"
+    out.save()
+    bpy.data.images.remove(out)
+    print("  -> %s  (%d cột × %d hàng)" % (out_path, frames, dirs))
+
+
+def main():
+    out_dir = CFG["out_dir"] or os.path.dirname(bpy.data.filepath) or os.getcwd()
+    out_dir = os.path.join(out_dir, "sprites")
+    os.makedirs(out_dir, exist_ok=True)
+    CFG["_out"] = out_dir
+
+    subject = pick_subject()
+    print("Đối tượng xoay: %s" % subject.name)
+
+    cam, foot, frac = setup_scene(subject)
+    print("foot = %.3f · nhân vật cao %.0f%% chiều cao ô" % (foot, frac * 100))
+
+    anims = {}
+    for game_name, (action_name, frames) in CFG["anims"].items():
+        key = "%s_%s" % (CFG["prefix"], game_name)
+        path = os.path.join(out_dir, key + ".png")
+        print("Render %s (action '%s', %d khung)..." % (game_name, action_name, frames))
+        render_sheet(subject, game_name, action_name, frames, path)
+        anims[game_name] = key
+
+    # đoạn khai báo dán thẳng vào game
+    snippet = {
+        "SKIN": {
+            "dirs": CFG["dirs"],
+            "hMul": round(3.2 / max(frac, 0.01) * 0.75, 2),
+            "foot": round(foot, 3),
+            "anims": anims,
+        },
+        "loadArt": {k: "assets/%s.png" % k for k in anims.values()},
+        "ghichu": "hMul chỉ là ước lượng ban đầu, chỉnh bằng mắt cho khớp bóng và tỉ lệ quái",
+    }
+    with open(os.path.join(out_dir, "sprites.json"), "w", encoding="utf-8") as f:
+        json.dump(snippet, f, indent=2, ensure_ascii=False)
+
+    print("\nXong. Dán vào game:")
+    print("  SKIN.walker = %s;" % json.dumps(snippet["SKIN"], ensure_ascii=False))
+    print("  loadArt(%s);" % json.dumps(snippet["loadArt"], ensure_ascii=False))
+
+
+main()

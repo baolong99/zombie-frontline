@@ -164,6 +164,34 @@ ngắm nằm đúng ranh giới hai hướng.
 Bộ nào chỉ có 5 hướng (Nam → Bắc) và trông đợi tự lật gương cho nửa còn lại thì phải dựng
 đủ 8 hàng trước khi nạp — code hiện chưa hỗ trợ lật gương.
 
+### Tự render từ mô hình 3D
+
+`tools/render_sprites.py` làm trọn khâu này. Nguồn art miễn phí hợp nhất là
+[Animated Characters Survivors](https://kenney.nl/assets/animated-characters-survivors)
+của Kenney — 3D có xương và hoạt cảnh sẵn, có cả người sống sót lẫn zombie, giấy phép CC0.
+
+```bash
+# mở file .blend đã import FBX, rồi:
+blender canh.blend --background --python tools/render_sprites.py
+```
+
+Sửa khối `CFG` ở đầu script: tên các action trong Blender, số khung mỗi hoạt cảnh, cạnh ô.
+Script xuất ra `sprites/` gồm các file PNG **và** một `sprites.json` chứa sẵn đoạn khai báo
+`SKIN` để dán thẳng vào game — trong đó `foot` đã được **tính ra** từ hình học camera chứ
+không phải ước lượng.
+
+Bốn chỗ script lo hộ, cũng là bốn chỗ làm tay hay sai:
+
+| | |
+|---|---|
+| Góc camera | Trực giao, nghiêng đúng `tilt_deg` (mặc định 60°), khớp `LEAN` trong game |
+| Thứ tự hàng | Hàng 0 quay mặt xuống dưới, các hàng sau theo chiều kim đồng hồ — trên màn hình tương ứng xoay **âm** quanh trục Z trong Blender |
+| Chiều xếp pixel | Blender xếp từ dưới lên, sprite sheet xếp từ trên xuống. Script tự lật |
+| Chuyển đổi màu | Ép về `Standard`; để nguyên Filmic/AgX là sprite nhạt và bệt hết |
+
+Nếu render ra mà hàng 0 không phải hướng quay mặt xuống dưới thì mô hình có tư thế gốc
+khác — chỉnh `facing_offset_deg` (thử 180, rồi 90, rồi −90).
+
 ## Kiểm thử
 
 ```bash
