@@ -76,8 +76,10 @@ ok(await page.$eval("#w-gold", e => e.textContent) === "77", "hồ sơ v0 đư�
 ok(!(await areas())[1].locked, "hồ sơ v0 giữ được khu vực đã qua");
 
 // --- cửa hàng: mua súng, nâng sao, mua và đeo phụ kiện
+// Đủ tiền mua bất cứ thứ gì: bài này kiểm CƠ CHẾ cửa hàng, không kiểm bảng giá. Giá là
+// thứ sẽ còn cân đi cân lại theo số đo, chốt cứng vào đây là cứ mỗi lần cân lại đỏ một loạt.
 await page.evaluate(() => localStorage.setItem("zf_profile", JSON.stringify(
-  { v:2, gold:10000, gem:100, cleared:{}, best:{}, runs:0, guns:{}, acc:{}, equip:[] })));
+  { v:2, gold:100000, gem:100, cleared:{}, best:{}, runs:0, guns:{}, acc:{}, equip:[] })));
 await page.reload();
 await page.waitForTimeout(400);
 
@@ -101,17 +103,38 @@ let g = await rows("#gunlist");
 ok(g.length === 5, "tab Súng liệt kê 5 khẩu");
 ok(g[0].acts.some(a => a.label === "Đang dùng"), "SMG là khẩu đang dùng");
 ok(g[0].acts.some(a => a.label.indexOf("Nâng sao") === 0), "SMG có sẵn nên nâng sao được");
-ok(g[4].acts[0].off, "Sniper 25.000 vượt quá 10.000 vàng nên nút bị khoá");
+// nút mua phải khoá khi không đủ tiền — kiểm bằng một hồ sơ nghèo, không bằng giá cụ thể
+await page.evaluate(() => { const p = JSON.parse(localStorage.getItem("zf_profile"));
+                            p.gold = 1; localStorage.setItem("zf_profile", JSON.stringify(p)); });
+await page.reload(); await page.waitForTimeout(350);
+await page.$eval('.tab[data-tab="guns"]', e => e.click());
+ok((await rows("#gunlist")).slice(1).every(r => r.acts[0].off),
+   "còn 1 vàng thì mọi nút mua đều khoá");
+await page.evaluate(() => { const p = JSON.parse(localStorage.getItem("zf_profile"));
+                            p.gold = 100000; localStorage.setItem("zf_profile", JSON.stringify(p)); });
+await page.reload(); await page.waitForTimeout(350);
+await page.$eval('.tab[data-tab="guns"]', e => e.click());
 
-// mua Rifle 2.500
+// mua Rifle — giá đọc từ chính cái nút, không chép số
+const priceOf = (list, row, pre) => page.$$eval(list + " .srow", (els, a) => {
+  const b = [...els[a.row].querySelectorAll(".s-btn")].find(x => x.textContent.trim().startsWith(a.pre));
+  return b ? +b.textContent.replace(/[^0-9]/g, "") : -1;
+}, { row, pre });
+const rifleCost = await priceOf("#gunlist", 1, "Mua");
+const before = await gold();
+ok(rifleCost > 0, "đọc được giá Rifle từ nút: " + rifleCost);
 ok(await press("#gunlist", 1, "Mua"), "bấm được nút mua Rifle");
-ok(await gold() === 7500, "mua Rifle trừ đúng 2.500 (còn " + (await gold()) + ")");
+ok(await gold() === before - rifleCost,
+   "mua Rifle trừ đúng " + rifleCost + " (còn " + (await gold()) + ")");
 g = await rows("#gunlist");
 ok(g[1].acts.some(a => a.label === "Chọn"), "mua xong Rifle thì chọn được làm khẩu xuất phát");
 
-// nâng sao Rifle: 800 cho sao đầu
+// nâng sao Rifle
+const starCost = await priceOf("#gunlist", 1, "Nâng sao");
+const beforeStar = await gold();
 ok(await press("#gunlist", 1, "Nâng sao"), "bấm được nút nâng sao Rifle");
-ok(await gold() === 6700, "sao đầu của Rifle tốn 800 (còn " + (await gold()) + ")");
+ok(await gold() === beforeStar - starCost,
+   "sao đầu của Rifle tốn " + starCost + " (còn " + (await gold()) + ")");
 ok((await rows("#gunlist"))[1].name.indexOf("★") > 0, "Rifle hiện một sao");
 
 // --- phụ kiện: mua bằng kim cương, nâng sao bằng vàng, giới hạn 3 ô

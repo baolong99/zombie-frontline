@@ -15,7 +15,19 @@ const PAGE = "file:///" + ROOT.split(String.fromCharCode(92)).join("/") + "/inde
 // node ladder.mjs guns   -> giữ nguyên Nông trại, đổi KHẨU SÚNG. Dùng để kiểm xem bảng
 // tính cách của từng khẩu có làm khẩu nào áp đảo không.
 const ARG = process.argv[2] || "";
-const GUN_MODE = ARG === "guns";
+const GUN_MODE = ARG === "guns" || ARG === "dps";
+// TRƯỜNG BẮN. Bật bất tử, bot đứng yên hoàn toàn, chạy tới đúng một mốc thời gian rồi đếm
+// số quái diệt được.
+//
+// Cần chế độ này vì bài đo sống sót đã tới giới hạn của nó. Cùng một cấu hình Rifle, ghim
+// cả hạt giống bot lẫn Math.random của trang, bốn lượt đo ra 532 · 338 · 735 · 182 quái —
+// lệch bốn lần. Ghim số ngẫu nhiên không đủ, vì nguồn hỗn loạn thật nằm ở NHỊP KHUNG HÌNH:
+// mỗi bước chờ 500ms thật ứng với một số khung không cố định, nên dt khác nhau, nên con
+// quái đáng lẽ chết lại sống, và từ đó mọi thứ rẽ nhánh. Cái chết khuếch đại sai số đó lên
+// tối đa. Bỏ cái chết đi và đếm ở một mốc thời gian cố định thì không còn điểm rẽ nhánh
+// nào, mà so sánh súng vốn chỉ cần thông lượng chứ không cần biết ai sống lâu hơn ai.
+const DPS_MODE = ARG === "dps";
+const DPS_T = +(process.env.LADDER_T || 150);
 const ONLY = GUN_MODE ? 0 : (+ARG || 0);
 const ALL_GUNS = ["smg", "rifle", "shotgun", "minigun", "sniper"];
 const RUNS = +(process.env.LADDER_RUNS || 2);
@@ -52,8 +64,10 @@ const DIRS = ["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"];
 // nhiên, nên nó đi cùng một hướng và bấm cùng thứ tự thẻ. Khác biệt còn lại giữa các ô
 // mới thật sự là khác biệt của khu vực và trang bị.
 //
-// Lưu ý: bản thân game vẫn dùng Math.random cho chỗ sinh quái và tỉ lệ rơi đồ, nên đây là
-// bớt nhiễu chứ không phải hết nhiễu. Muốn hết thì phải nhét hạt giống vào trong game.
+// Nguồn nhiễu thứ hai là Math.random của CHÍNH GAME — chỗ sinh quái, tỉ lệ rơi đồ, độ tản
+// đạn. Minigun đo hai đợt với cùng hạt giống bot ra 286 rồi 184, tức vẫn ±35%, đủ để nuốt
+// chửng mọi khác biệt dưới 40%. Chữa bằng addInitScript: thay luôn Math.random của trang
+// bằng cùng một chuỗi giả ngẫu nhiên. Không phải sửa một dòng nào trong game.
 function lcg(seed){
   let x = seed >>> 0;
   return () => { x = (x * 1664525 + 1013904223) >>> 0; return x / 4294967296; };
@@ -63,6 +77,10 @@ async function one(areaIdx, kitKey, seed){
   const kit = KITS[kitKey];
   const rand = lcg(seed);
   const page = await browser.newPage({ viewport: { width: 1200, height: 780 } });
+  await page.addInitScript(sd => {
+    let x = sd >>> 0;
+    Math.random = () => { x = (x * 1664525 + 1013904223) >>> 0; return x / 4294967296; };
+  }, seed);
   const errors = [];
   page.on("pageerror", e => errors.push(String(e)));
   await page.goto(PAGE, { waitUntil: "load" });
@@ -77,6 +95,8 @@ async function one(areaIdx, kitKey, seed){
   await page.$$eval(".areabtn", (els, i) => els[i].click(), areaIdx);
   await page.$eval("#btn-start", el => el.click());
   await page.$eval("#s-time", el => { el.value = "5"; el.dispatchEvent(new Event("input")); });
+  if (DPS_MODE)
+    await page.$eval("#t-god", el => { el.checked = true; el.dispatchEvent(new Event("change")); });
 
   const state = async () => JSON.parse(await page.evaluate(() => window.render_game_to_text()));
   async function clearPicks(){
@@ -91,8 +111,9 @@ async function one(areaIdx, kitKey, seed){
   }
 
   let held = null, s = null;
-  for (let step = 0; step < 110; step++){
-    if (step % 4 === 0){
+  for (let step = 0; step < (DPS_MODE ? 400 : 110); step++){
+    // trường bắn: không bấm phím nào cả, đứng yên tuyệt đối
+    if (!DPS_MODE && step % 4 === 0){
       if (held) await page.keyboard.up(held);
       held = DIRS[Math.floor(rand() * 4)];
       await page.keyboard.down(held);
@@ -101,6 +122,7 @@ async function one(areaIdx, kitKey, seed){
     await clearPicks();
     s = await state();
     if (s.mode === "dead" || s.mode === "win") break;
+    if (DPS_MODE && s.t >= DPS_T) break;
   }
   if (held) await page.keyboard.up(held);
   const out = { mode:s.mode, t:s.t, kills:s.kills, lvl:s.lvl,
@@ -139,12 +161,21 @@ for (let a = 0; a < AREAS.length; a++){
                   chet:dead.length ? Math.round(dead.reduce((x, y) => x + y.t, 0) / dead.length) : "-",
                   diet:Math.round(rs.reduce((x, y) => x + y.kills, 0) / rs.length),
                   loi:rs.reduce((x, y) => x + y.err, 0) };
+    // Trường bắn bất tử mà diệt 0 con thì súng không bắn được — đó là lỗi chương trình,
+    // không phải số liệu. Đã từng xảy ra thật: một ReferenceError trong fire() làm mọi
+    // khẩu ra 0, và nếu không chặn ở đây thì nó trôi vào bảng như một kết quả cân bằng.
+    if (DPS_MODE && row.diet === 0){
+      console.log("LỖI: " + row.kit + " diệt 0 con ở trường bắn — súng không bắn được");
+      process.exitCode = 1;
+    }
     table.push(row);
     console.log(JSON.stringify(row));
   }
 }
 await browser.close();
 console.log("\n=== BẢNG THANG KHU VỰC (" + RUNS + " lượt mỗi ô) ===");
+if (DPS_MODE) console.log("(trường bắn: bất tử, đứng yên, dừng ở giây " + DPS_T +
+                          " — 'diệt TB' là THÔNG LƯỢNG, 'chết ở' vô nghĩa)");
 console.log("khu vực   trang bị   súng      thắng   giây TB   chết ở   diệt TB");
 table.forEach(r => console.log(
   r.area.padEnd(10) + r.kit.padEnd(11) + r.gun.padEnd(10) +

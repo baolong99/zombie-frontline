@@ -637,9 +637,9 @@
       "shop.use":"Chọn", "shop.using":"Đang dùng",
       "trait.smg":"Tốc bắn +15%",
       "trait.rifle":"Thay đạn nhanh hơn 35%",
-      "trait.shotgun":"Máu tối đa +25%",
+      "trait.shotgun":"Máu tối đa +25% · sát thương ×1,8 trong 150px · một loạt trúng 3 con thì hồi 1% máu",
       "trait.minigun":"Thay đạn chậm hơn 40% · chạy chậm 12%",
-      "trait.sniper":"Đứng yên là ăn thưởng ngay · chạy chậm 18%",
+      "trait.sniper":"Đứng yên: thưởng ×1,8, xuyên cả hàng, xoay nòng gấp đôi · chạy chậm 18%",
       "meta.turn":"tốc xoay nòng", "meta.range":"tầm bắn", "meta.bspeed":"tốc độ đạn",
       "meta.mag":"băng đạn", "meta.pickup":"bán kính nhặt", "meta.gold":"vàng rơi",
       "meta.xp":"kinh nghiệm", "meta.none":"chưa có hệ số nào",
@@ -695,7 +695,7 @@
       "uni.heavy.list":["Sát thương ×1,7","Bán kính đạn +5 px","Tốc độ bắn ×0,60"],
       "uni.swarm.n":"Bão Đạn",
       "uni.swarm.d":"Ba đường đạn bắn như mưa, nhưng mỗi viên nhẹ hều.",
-      "uni.swarm.list":["+2 đường đạn","Tốc độ bắn ×1,60","Sát thương ×0,55","Cỡ đạn ×0,60"],
+      "uni.swarm.list":["+2 đường đạn","Tốc độ bắn ×1,60","35% phát bắn không tốn đạn","Sát thương ×0,55","Cỡ đạn ×0,60"],
       "uni.rail.n":"Xuyên Phá",
       "uni.rail.d":"Cả băng đạn chỉ còn đúng một viên, nhưng viên đó siêu to, bay xa hơn tầm nhìn nhiều lần và xuyên thủng mọi thứ trên đường. Nâng cấp sau không tăng được số đạn trong băng, nhưng vẫn tăng được nhịp bắn và tốc độ thay đạn.",
       "uni.rail.list":["Băng đạn cố định 1 viên","Cả chùm đạn ghém dồn vào một viên","Bán kính đạn +9 px",
@@ -787,9 +787,9 @@
       "shop.use":"Select", "shop.using":"In use",
       "trait.smg":"Fire rate +15%",
       "trait.rifle":"Reloads 35% faster",
-      "trait.shotgun":"Max HP +25%",
+      "trait.shotgun":"Max HP +25% · ×1.8 damage inside 150px · a volley hitting 3 heals 1% HP",
       "trait.minigun":"Reloads 40% slower · 12% slower on foot",
-      "trait.sniper":"Steady bonus with no wind-up · 18% slower on foot",
+      "trait.sniper":"Standing still: ×1.8, shots pierce the whole line, double turn rate · 18% slower on foot",
       "meta.turn":"turn rate", "meta.range":"range", "meta.bspeed":"bullet speed",
       "meta.mag":"magazine", "meta.pickup":"pickup radius", "meta.gold":"gold drops",
       "meta.xp":"xp gain", "meta.none":"no modifiers yet",
@@ -845,7 +845,7 @@
       "uni.heavy.list":["Damage ×1.7","Bullet radius +5 px","Fire rate ×0.60"],
       "uni.swarm.n":"Bullet Storm",
       "uni.swarm.d":"Three lines of fire pouring out at once, but every round is feather-light.",
-      "uni.swarm.list":["+2 lines of fire","Fire rate ×1.60","Damage ×0.55","Bullet size ×0.60"],
+      "uni.swarm.list":["+2 lines of fire","Fire rate ×1.60","35% of shots cost no ammo","Damage ×0.55","Bullet size ×0.60"],
       "uni.rail.n":"Railshot",
       "uni.rail.d":"Your magazine holds exactly one round, but that round is enormous, flies several screens deep and punches through everything on the way. Later upgrades cannot add rounds to the magazine, but fire rate and reload speed still work.",
       "uni.rail.list":["Magazine locked to 1 round","The whole shotgun spread folds into one slug","Bullet radius +9 px",
@@ -960,17 +960,35 @@
   //
   // Mục đích là để chọn khẩu là chọn LỐI CHƠI chứ không phải chọn khẩu mạnh nhất. Vì thế
   // mỗi cái được đều phải trả giá: nhanh thì mỏng, dai thì chậm, mạnh thì đứng yên.
+  // Shotgun và Sniper đo ra yếu hơn hẳn phần còn lại — 47 và 130 quái diệt được so với
+  // 350 của SMG, ở cùng sao, cùng phụ kiện, cùng hạt giống. Cả hai đều yếu vì cùng một
+  // lý do gốc chứ không phải vì thiếu chỉ số, nên chữa bằng cách đổi VAI TRÒ:
+  //   Shotgun yếu vì tầm 210 buộc phải áp sát -> biến việc áp sát thành phần thưởng
+  //   Sniper  yếu vì một viên một mục tiêu    -> đứng yên thì một phát dọn cả một hàng
   var TRAIT = {
     smg:     { rateMul:0.85 },                        // bắn nhanh hơn 15%
     rifle:   { reloadMul:0.65 },                      // thay đạn nhanh hơn 35%
-    shotgun: { hpMul:1.25 },                          // máu tối đa +25%
+    shotgun: { hpMul:1.25, closeMul:1.80, closeR:150, volleyHeal:0.01, volleyNeed:3 },
     minigun: { reloadMul:1.40, speedMul:0.88 },       // súng nặng: nạp lâu, chạy chậm
-    sniper:  { steadyNow:true, speedMul:0.82 }        // đứng yên là ăn thưởng ngay, đổi lấy tốc chạy
+    // steadyTurn: trường bắn đo ra nút thắt của Sniper là TỐC XOAY 240°/s chứ không phải
+    // sát thương — nó dành phần lớn thời gian quay người. Đứng yên thì xoay gấp đôi, đúng
+    // hình ảnh khẩu súng đã chống chân đế, và chữa đúng chỗ đang nghẽn.
+    sniper:  { steadyNow:true, speedMul:0.82, steadyPierce:true, steadyTurn:2.0 }
   };
   function trait(id){ return TRAIT[id] || {}; }
   function traitOf(){ return G ? trait(WEAPONS[G.player.wi].id) : {}; }
 
   var STEADY_AFTER = 0.5;
+  // Người chơi có đang THỰC SỰ đứng yên không.
+  //
+  // Cạm bẫy: stillT bị đặt về 0 ngay khi có phím di chuyển, nên "stillT >= 0" đúng CẢ KHI
+  // đang chạy. Viết steadyNow thành ngưỡng 0 rồi so bằng >= là thưởng đứng yên bật vĩnh
+  // viễn — Sniper mất hẳn tính cách và chỉ còn là ×1,8 miễn phí. Phải có thêm "> 0".
+  function steadyOn(tr){
+    if (!G) return false;
+    var st = G.player.stillT;
+    return st > 0 && st >= (tr && tr.steadyNow ? 0 : STEADY_AFTER);
+  }
   WEAPONS.forEach(function(w){ w.dps = Math.round(w.dmg * w.pellets / w.rate); });
 
   // ---- CỬA HÀNG: bảy chỉ số meta, và chỉ bảy chỉ số này.
@@ -992,12 +1010,24 @@
   // Súng mở khoá bằng VÀNG, nâng sao bằng VÀNG. Vàng kiếm được mỗi ván nên không bao giờ
   // tắc đường; kim cương để dành cho phụ kiện, thứ có thể không mua cũng chơi được.
   // starGain là phần CỘNG THÊM vào hệ số ×1 cho mỗi sao, nên ★★★★★ của SMG là băng ×1,6.
+  // Giá đặt theo SỨC MẠNH ĐO ĐƯỢC, không theo "nghe có vẻ ngầu". Bảng cũ xếp Sniper đắt
+  // nhất 25.000 và Rifle rẻ nhất 2.500, trong khi hai bài đo nói ngược hẳn:
+  //
+  //   khẩu      DPS trùm (tests/dps.mjs)   dọn bầy (trường bắn)
+  //   minigun   141                        492
+  //   rifle     132                        545      <- toàn diện nhất
+  //   sniper    115                        243      <- chuyên trùm, dọn bầy kém
+  //   smg        93                        456
+  //   shotgun    93                        451      <- kèm máu +25% và hồi máu
+  //
+  // Sniper dọn bầy kém KHÔNG phải vì yếu mà vì thừa sát thương: 171 mỗi phát vào con quái
+  // 50 máu là phí hai phần ba. Đó đúng là bản chất khẩu bắn tỉa, không phải lỗi cần chữa.
   var GUNS = {
     smg:     { cost:0,     starBase:500,  starGain:{ mag:0.12, turn:0.06 } },
-    rifle:   { cost:2500,  starBase:800,  starGain:{ range:0.08, bspeed:0.06 } },
-    shotgun: { cost:6000,  starBase:1200, starGain:{ mag:0.14, turn:0.08 } },
-    minigun: { cost:14000, starBase:1800, starGain:{ turn:0.10, mag:0.10 } },
-    sniper:  { cost:25000, starBase:2600, starGain:{ range:0.10, bspeed:0.08 } }
+    shotgun: { cost:3000,  starBase:700,  starGain:{ mag:0.14, turn:0.08 } },
+    sniper:  { cost:6000,  starBase:900,  starGain:{ range:0.10, bspeed:0.08 } },
+    rifle:   { cost:15000, starBase:1600, starGain:{ range:0.08, bspeed:0.06 } },
+    minigun: { cost:22000, starBase:2200, starGain:{ turn:0.10, mag:0.10 } }
   };
   var MAX_STAR = 5;
 
@@ -1052,7 +1082,7 @@
   // nâng cấp độc nhất từ trùm phụ — chỉ chọn được một lần mỗi lượt và định hình cả bản build
   var UNIQUES = {
     heavy: { c:"#ff7a4e", dmgMul:1.7, radAdd:5, fireMul:0.60 },
-    swarm: { c:"#8ee64a", linesAdd:2, fireMul:1.60, dmgMul:0.55, radMul:0.60 },
+    swarm: { c:"#8ee64a", linesAdd:2, fireMul:1.60, dmgMul:0.55, radMul:0.60, freeShot:0.35 },
     rail:  { c:"#4ec9e0", oneShot:true, radAdd:9, dmgMul:4.5, fireMul:0.55, reloadFixed:0.22 },
     tank:  { c:"#b07cff", bodyScale:1.5, hpMul:1.6, regen:25 }
   };
@@ -1262,6 +1292,8 @@
       // goldAcc giữ phần lẻ của hệ số vàng. Không có nó thì mỗi đồng 1 vàng ×1,3 làm
       // tròn xuống lại thành 1, và phụ kiện Túi Tiền thành vô tác dụng hoàn toàn.
       meta:metaBase(), goldAcc:0,
+      // một loạt = một lần bóp cò, kể cả 8 viên ghém của Shotgun
+      volleyId:0, volley:{ id:-1, n:0, paid:false },
       player:{ x:0, y:0, r:14, a:-Math.PI/2, hp:100, maxhp:100,
                iframe:0, wi:firstOwned(), spin:0, muzzle:0, stillT:0, shieldUp:false, shieldT:0, regenT:25,
                moveA:null, anim:"idle", ft:0,
@@ -1347,7 +1379,9 @@
       range = 4000;
     }
 
-    return { base:w, turn:w.turn * T.turnMul * M.turn, arc:T.frontArc,
+    var turn = w.turn * T.turnMul * M.turn;
+    if (tr.steadyTurn && steadyOn(tr)) turn *= tr.steadyTurn;
+    return { base:w, turn:turn, arc:T.frontArc,
              bspeed:w.bspeed * M.bspeed, meta:M, trait:tr,
              rate:rate, dmg:dmg, rad:rad, lines:lines, pellets:pellets,
              rear:has("rear") ? 2 : 0, pierce:pierce, bounce:bounce, rebound:rebound,
@@ -1689,13 +1723,17 @@
     var p = G.player, ws = wstat(p.wi), w = ws.base, g = G.guns[p.wi];
     var ox = p.x + Math.cos(p.a) * (p.r + 3), oy = p.y + Math.sin(p.a) * (p.r + 3);
     var n = ws.pellets, lines = ws.lines, fan = 9 * Math.PI / 180;
-    var after = ws.trait.steadyNow ? 0 : STEADY_AFTER;
-    var steady = (ws.steady && p.stillT >= after) ? ws.steady : 1;
+    G.volleyId++;
+    var still = steadyOn(ws.trait);
+    var steady = (ws.steady && still) ? ws.steady : 1;
+    // Đứng yên thì viên đạn xuyên hết cả hàng. Đây mới là thứ cứu Sniper: vấn đề của nó
+    // chưa bao giờ là sát thương mỗi viên mà là một viên chỉ giết được một con.
+    var deep = ws.trait.steadyPierce && still;
     for (var L = 0; L < lines; L++){
       var lineA = p.a + (L - (lines - 1) / 2) * fan;
       for (var i = 0; i < n; i++){
         var sp = (w.spread * Math.PI / 180) * (n > 1 ? (i / (n - 1) - 0.5) * 2 : rnd(-0.5, 0.5));
-        shoot(ox, oy, lineA + sp, ws, steady);
+        shoot(ox, oy, lineA + sp, ws, steady, deep ? { deep:true } : null);
       }
     }
     for (var R = 0; R < ws.rear; R++)
@@ -1713,7 +1751,14 @@
       }
     }
 
-    g.ammo--; p.muzzle = 0.055;
+    // Bão Đạn: có tỉ lệ viên vừa bắn không bị trừ vào băng. Nó bắn gấp 1,60 lần nên đốt
+    // băng cũng gấp 1,60, và 35% không tốn đạn kéo dài băng thêm 1,54 lần — gần như bù
+    // đúng chỗ đau mà không đụng vào sát thương hay tốc bắn.
+    var uq = uni();
+    var freeShot = uq && uq.freeShot && Math.random() < uq.freeShot;
+    if (!freeShot) g.ammo--;
+    else spark(ox, oy, 2, "rgba(142,230,74,.95)", 90, 0.22);
+    p.muzzle = 0.055;
     if (T.shake) G.shake = Math.min(11, G.shake + w.shake);
     if (w.id === "shotgun") { noise(0.16, 0.1); blip(90, 0.09, "sawtooth", 0.05); }
     else if (w.id === "rifle") { blip(320, 0.05, "square", 0.035); noise(0.05, 0.035); }
@@ -1740,7 +1785,14 @@
       dmg:ws.dmg * (mul || 1), left:ws.range, range:ws.range, pierce:ws.pierce, pierceLeft:ws.pierce,
       bounce:ws.bounce, rebound:ws.rebound || 0,
       rad:ws.rad, kb:ws.base.kb, c:ws.base.color, trail:ws.base.trail,
-      hits:[] };
+      closeMul:ws.trait.closeMul || 0, closeR:ws.trait.closeR || 0,
+      volleyHeal:ws.trait.volleyHeal || 0, volleyNeed:ws.trait.volleyNeed || 0,
+      hits:[], volley:G.volleyId };
+    // Xuyên sâu của Sniper lúc đứng yên: xuyên không giới hạn, bay hết tầm
+    if (extra && extra.deep){
+      b.pierce = 9999; b.pierceLeft = 9999;
+      b.trail = ws.base.trail + 10;
+    }
     if (extra && extra.slug){
       b.slug = true;
       b.rad = ws.rad + 6;
@@ -1750,6 +1802,22 @@
     }
     G.bullets.push(b);
   }
+  // Một LOẠT là một lần bóp cò, tính cả 8 viên ghém. Shotgun hồi máu khi một loạt trúng
+  // đủ đông — thưởng cho việc lao vào giữa đám, đúng vai trò của nó.
+  function volleyHit(b){
+    if (b.volley !== G.volleyId && b.volley !== G.volleyId - 1) return;
+    var v = G.volley;
+    if (v.id !== b.volley){ v.id = b.volley; v.n = 0; v.paid = false; }
+    v.n++;
+    if (v.paid || v.n < b.volleyNeed) return;
+    v.paid = true;
+    var p = G.player, heal = Math.max(1, Math.round(p.maxhp * b.volleyHeal));
+    if (p.hp < p.maxhp){
+      p.hp = Math.min(p.maxhp, p.hp + heal);
+      spark(p.x, p.y - 8, 3, "rgba(150,240,150,.9)", 70, 0.3);
+    }
+  }
+
   // Bình thường nảy sang con GẦN NHẤT và yếu dần đi. Đạn Truy Hồn lật cả hai: tầm xa hơn,
   // nhắm con SẮP CHẾT NHẤT, và mỗi lần nảy lại mạnh thêm — nên một viên quét sạch cả cụm.
   function bounceTo(b, from){
@@ -2560,7 +2628,11 @@
         zz.x += b.vx / kl * b.kb * 0.08; zz.y += b.vy / kl * b.kb * 0.08;
         spark(b.x, b.y, 4, "rgba(190,60,60,.9)", 120, 0.32);
         blip(700 + Math.random() * 200, 0.02, "square", 0.012);
-        hurt(zz, b.dmg, travel, !!b.hex);
+        // Shotgun: càng sát mặt càng đau. Biến cái yếu (tầm 210, phải áp sát) thành cái được.
+        var hitDmg = b.dmg;
+        if (b.closeMul && Math.hypot(zz.x - p.x, zz.y - p.y) < b.closeR) hitDmg *= b.closeMul;
+        hurt(zz, hitDmg, travel, !!b.hex);
+        if (b.volleyHeal) volleyHit(b);
 
         // Đạn Nện nổ tại điểm chạm, quét cả cụm quanh đó
         if (b.slug) slugBlast(b.x, b.y, b.dmg * 0.6, travel);
@@ -3660,7 +3732,7 @@
     pHead();
 
     var by = y - 20 * S;   // mốc giữa thân, cho các vòng hiệu ứng bên dưới
-    if (wd.steady && p.stillT >= STEADY_AFTER){
+    if (wd.steady && steadyOn(trait(wd.id))){
       ctx.strokeStyle = "rgba(207,232,255,.55)"; ctx.lineWidth = 1.4;
       ctx.setLineDash([3, 4]);
       ctx.beginPath(); ctx.arc(x, by, p.r + 5, 0, 6.283); ctx.stroke();
@@ -3748,7 +3820,7 @@
     // DPS thực tế phải cộng cả thời gian thay đạn, nếu không băng 1 viên sẽ hiện con số vô nghĩa
     var effRate = ws.rate + ws.reload / Math.max(1, ws.mag);
     $("w-dps").textContent = Math.round(ws.dmg * ws.pellets * ws.lines / effRate);
-    var ready = ws.steady && G.player.stillT >= (ws.trait.steadyNow ? 0 : STEADY_AFTER);
+    var ready = ws.steady && steadyOn(ws.trait);
     $("w-steadyl").hidden = !ws.steady;
     $("w-steady").hidden = !ws.steady;
     if (ws.steady){
@@ -4169,7 +4241,13 @@
       player:{ world:[Math.round(p.x), Math.round(p.y)], hp:Math.round(p.hp), maxhp:Math.round(p.maxhp),
                aimDeg:Math.round(p.a * 180 / Math.PI), r:Math.round(p.r), shield:p.shieldUp },
       weapon:{ id:WEAPONS[p.wi].id, ammo:gun.ammo, mag:ws.mag, reloading:gun.reloadT > 0,
-               lines:ws.lines, dmg:Math.round(ws.dmg), range:Math.round(ws.range) },
+               lines:ws.lines, dmg:Math.round(ws.dmg), range:Math.round(ws.range),
+               // đủ để tính DPS ngoài game mà không phải chép lại công thức của wstat
+               rate:Math.round(ws.rate * 1000) / 1000, reload:Math.round(ws.reload * 100) / 100,
+               pellets:ws.pellets, pierce:ws.pierce, turn:Math.round(ws.turn),
+               // thưởng đứng yên áp lúc bắn chứ không nằm trong ws.dmg, nên phải đưa
+               // riêng ra đây, nếu không mọi phép tính DPS ngoài game sẽ hụt 1,8 lần
+               spread:ws.base.spread, steady:ws.steady || 0, steadyOn:steadyOn(ws.trait) },
       view:{ w:Math.round(vw), h:Math.round(vh) },
       target:G.target && !G.target.dead ? { at:rel(G.target), rear:G.rearLock } : null,
       zombies:{ onScreen:vis.length, offScreen:off, list:vis.slice(0, 24),

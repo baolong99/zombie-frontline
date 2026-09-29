@@ -87,12 +87,34 @@ chỉnh hệ này không phải đo lại hệ kia.
 
 | | Mở khoá | Nâng sao |
 |---|---|---|
-| Súng (`GUNS`) | vàng — 0 / 2.500 / 6.000 / 14.000 / 25.000 | vàng, `starBase × (sao+1)` |
+| Súng (`GUNS`) | vàng — xem bảng dưới | vàng, `starBase × (sao+1)` |
 | Phụ kiện (`ACC`) | kim cương — 20 đến 40 | vàng, `starBase × (sao+1)` |
 
 Súng mở bằng vàng chứ không phải kim cương là chủ ý: kim cương hiện chỉ đến từ lần đầu dọn
 sạch một khu vực, nên nếu súng cần kim cương thì người chơi kẹt cứng ở khu vực 2. Vàng thì
 ván nào cũng có.
+
+### Tính cách từng khẩu và bảng giá
+
+`TRAIT` cho mỗi khẩu một buff kèm một cái giá, để chọn súng là chọn **lối chơi** chứ không
+phải chọn khẩu mạnh nhất. Đây là thuộc tính gốc của khẩu súng, **không phải hàng cửa hàng**,
+nên nó không phạm quy tắc tách đôi.
+
+| Khẩu | Tính cách | DPS trùm | Dọn bầy | Giá |
+|---|---|---|---|---|
+| SMG | tốc bắn +15% | 93 | 456 | 0 |
+| Shotgun | máu +25% · ×1,8 trong 150px · loạt trúng 3 con hồi 1% máu | 93 | 451 | 3.000 |
+| Sniper | đứng yên: ×1,8, xuyên cả hàng, xoay gấp đôi · chạy chậm 18% | 115 | 243 | 6.000 |
+| Rifle | thay đạn nhanh 35% | 132 | 545 | 15.000 |
+| Minigun | thay đạn chậm 40% · chạy chậm 12% | 141 | 492 | 22.000 |
+
+Cột **DPS trùm** từ `tests/dps.mjs`, cột **dọn bầy** từ trường bắn của `tests/ladder.mjs`.
+Giá đặt theo hai cột đó chứ không theo cảm tính — bảng đầu tiên xếp Sniper đắt nhất 25.000
+và Rifle rẻ nhất 2.500, đúng ngược với số đo.
+
+Sniper dọn bầy kém **không phải vì yếu** mà vì thừa sát thương: 171 mỗi phát vào con quái
+50 máu là phí hai phần ba. Đó là bản chất khẩu bắn tỉa, không phải lỗi cần chữa — nên nó
+được định giá như một khẩu ngách chuyên trùm, không phải khẩu cao cấp nhất.
 
 Mỗi khẩu có `starGain` riêng — SMG lên sao được băng đạn và tốc xoay, Sniper lên sao được
 tầm và tốc đạn — nên nâng sao có tính cách chứ không phải cùng một cục phần trăm.
@@ -285,9 +307,37 @@ npm run all
 | `boss.mjs` | Luồng cuối màn: trùm phụ → vòng vây → elite → hộp → trùm chính → thắng |
 | `arena.mjs` | Vòng vây kẹp đúng bán kính, mũi tên chỉ hộp |
 | `visual.mjs` | Chụp toàn trang: HUD, bảng Tune, menu nâng cấp, đổi ngôn ngữ giữa menu |
-| `meta.mjs` | Sảnh, ví, thang khu vực và cửa hàng: khoá/mở, mua súng, nâng sao, ba ô phụ kiện, hồ sơ hỏng và hồ sơ phiên bản cũ |
+| `meta.mjs` | Sảnh, ví, thang khu vực và cửa hàng: khoá/mở, mua súng, nâng sao, ba ô phụ kiện, tính cách súng, hồ sơ hỏng và hồ sơ phiên bản cũ |
+| `ladder.mjs` | Cân bằng: ma trận khu vực × trang bị, chế độ `guns` so năm khẩu, chế độ `dps` là trường bắn bất tử đo thông lượng |
+| `dps.mjs` | DPS đơn mục tiêu (sức đánh trùm) của từng khẩu, đọc số đã tính ra khỏi game chứ không chép lại công thức |
 | `themes.mjs` | Chụp ba khu vực ở cùng thời điểm để so sánh |
 | `survive.mjs` | **Tắt bất tử**, 3 lượt, đo bot sống được bao lâu. Nhận đường dẫn file khác làm tham số để so hai phiên bản |
+
+### Đo cân bằng: bài học từ một cái cân hỏng
+
+`ladder.mjs` đi qua bốn đời trước khi tin được, và lý do đáng ghi lại:
+
+1. **Ban đầu** mỗi ô một chuỗi ngẫu nhiên riêng — cùng một cấu hình nông trại chạy hai đợt
+   ra 87 rồi 65 giây, **±25%**.
+2. **Ghim hạt giống của bot** (lượt thứ n của mọi ô bấm cùng thứ tự thẻ, đi cùng hướng) —
+   khá hơn, nhưng Minigun vẫn tụt từ 286 xuống 184 dù không sửa gì.
+3. **Ghim luôn `Math.random` của trang** bằng `addInitScript` — Rifle vẫn ra 532 · 338 ·
+   735 · 182, **lệch bốn lần**. Ghim số ngẫu nhiên không đủ.
+4. **Bỏ cái chết ra khỏi phép đo** (chế độ `dps`: bất tử, đứng yên, dừng ở một mốc thời
+   gian cố định, đếm thông lượng) — dao động xuống **±1–6%**.
+
+Nguồn hỗn loạn thật không phải số ngẫu nhiên mà là **nhịp khung hình**: mỗi bước chờ 500ms
+thật ứng với một số khung không cố định, nên `dt` khác nhau, nên con quái đáng lẽ chết lại
+sống thêm một khung — và cái chết khuếch đại sai số đó lên tối đa vì nó là một điểm rẽ
+nhánh. Muốn so sánh súng thì không cần biết ai sống lâu hơn, chỉ cần biết ai bắn được nhiều
+hơn.
+
+Hệ quả cho người đọc bảng sau này: **mọi con số từ bài đo sống sót chỉ đọc được theo thứ tự
+hạng, không đọc được theo tỉ lệ.** Muốn con số tỉ lệ thì dùng `dps` hoặc `dps.mjs`.
+
+Trường bắn cũng có mù của nó: nó chỉ đo dọn bầy. Sniper đo ra thấp nhất ở đó nhưng DPS đơn
+mục tiêu lại hạng ba — đọc một bảng rồi đi buff là buff nhầm chỗ, và đã xảy ra đúng như vậy
+một lần với giả thiết "nghẽn ở tốc xoay nòng".
 
 `survive.mjs` là bài duy nhất trả lời được câu "cân bằng có ổn không". Con bot chọn ngẫu
 nhiên và chạy loạn nên nó dở hơn người thật nhiều — đọc nó như **mức sàn so sánh giữa hai
