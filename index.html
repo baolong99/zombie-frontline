@@ -461,7 +461,7 @@
         <button class="dbtn" id="d-uniq" type="button" data-i18n="btn.uniq"></button>
         <button class="dbtn wide" id="d-cratefar" type="button" data-i18n="btn.cratefar"></button>
         <button class="dbtn wide" id="d-mainboss" type="button" data-i18n="btn.mainboss"></button>
-        <button class="dbtn wide" id="d-gold" type="button"></button>
+        <button class="dbtn wide" id="dbg-gold" type="button"></button>
       </div>
     </div>
 
@@ -4134,9 +4134,9 @@
   // ẩn, còn số vàng trên HUD là điểm số của ván chứ không phải ví — bấm xong không có gì
   // trên màn hình đổi, và trông y như nút hỏng.
   function syncGoldBtn(){
-    $("d-gold").textContent = t("btn.gold", { n:fmtN(wallet.balance("gold")) });
+    $("dbg-gold").textContent = t("btn.gold", { n:fmtN(wallet.balance("gold")) });
   }
-  $("d-gold").addEventListener("click", function(){
+  $("dbg-gold").addEventListener("click", function(){
     wallet.grant("gold", 10000, "nút_thử");
     renderLobby();
     syncGoldBtn();

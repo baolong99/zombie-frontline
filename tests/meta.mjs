@@ -222,8 +222,8 @@ await page.evaluate(() => localStorage.setItem("zf_profile", JSON.stringify(
 await page.reload();
 await page.waitForTimeout(400);
 ok(await page.$eval("#w-gold", e => +e.textContent) === 0, "bắt đầu với ví rỗng");
-await page.$eval("#d-gold", e => e.click());
-await page.$eval("#d-gold", e => e.click());
+await page.$eval("#dbg-gold", e => e.click());
+await page.$eval("#dbg-gold", e => e.click());
 ok(await page.$eval("#w-gold", e => +e.textContent) === 20000,
    "bấm hai lần được 20.000 và hiện ngay trên sảnh");
 await page.reload();
@@ -231,8 +231,8 @@ await page.waitForTimeout(400);
 ok(await page.$eval("#w-gold", e => +e.textContent) === 20000, "vàng nút thử sống qua tải lại");
 // Nhãn phải mang số dư: trong ván thì thanh ví bị ẩn, không có nó thì bấm xong
 // không thấy gì đổi và nút trông y như hỏng.
-ok((await page.$eval("#d-gold", e => e.textContent)).indexOf("20.000") > 0,
-   "nhãn nút hiện số dư ví: " + await page.$eval("#d-gold", e => e.textContent));
+ok((await page.$eval("#dbg-gold", e => e.textContent)).indexOf("20.000") > 0,
+   "nhãn nút hiện số dư ví: " + await page.$eval("#dbg-gold", e => e.textContent));
 
 // --- tạm dừng giữa ván phải ra được sảnh để tiêu số vàng đó
 await page.$eval("#btn-start", e => e.click());

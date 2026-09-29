@@ -20,4 +20,23 @@ while ((m = re.exec(html))) {
   }
 }
 console.log(bad ? "FAILED" : "tất cả script đều parse được");
-process.exit(bad ? 1 : 0);
+
+// ---- id trùng nhau
+// Đây là lỗi câm nhất trong cả file: getElementById trả về phần tử ĐẦU TIÊN mang id đó,
+// nên cái thứ hai vừa không nhận sự kiện vừa không được gán chữ, mà không có lỗi nào được
+// ném ra. Đã xảy ra thật: nút "+10.000 vàng" trùng id với ô vàng trên màn hình chết, nên
+// nút hiện ra trống trơn và bấm không ăn gì, trong khi mọi bài kiểm khác đều xanh.
+const ids = {};
+let dup = 0;
+const idRe = /\sid="([^"]+)"/g;
+let mm;
+while ((mm = idRe.exec(html))){
+  const id = mm[1];
+  ids[id] = (ids[id] || 0) + 1;
+  if (ids[id] === 2){
+    dup++;
+    console.log("ID TRÙNG: \"" + id + "\" xuất hiện nhiều lần");
+  }
+}
+if (!dup) console.log("không có id trùng (" + Object.keys(ids).length + " id)");
+process.exit(bad || dup ? 1 : 0);
