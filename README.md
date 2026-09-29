@@ -66,8 +66,42 @@ Thang khu vực tồn tại để **tạo nhu cầu cho cửa hàng**: từ Qu�
 không sẽ không qua nổi, và đó là lúc súng với phụ kiện có lý do tồn tại. Chúng chưa có, nên
 hiện tại khu vực 2+ đang cố tình khó quá mức.
 
-Màn hình bắt đầu giờ là **sảnh**: ví ở trên, danh sách khu vực ở dưới, và "Chơi lại" sau khi
+Màn hình bắt đầu giờ là **sảnh** ba tab — Khu vực · Súng · Phụ kiện — và "Chơi lại" sau khi
 thắng/thua quay về đây chứ không vào thẳng ván mới.
+
+### Quy tắc tách đôi
+
+Đây là ràng buộc quan trọng nhất của toàn bộ hệ kinh tế:
+
+> Cửa hàng **không bao giờ** đụng vào sát thương, tốc bắn, xuyên, nảy, hút máu hay số tia.
+> Cây nâng cấp trong ván **không bao giờ** đụng vào bảy chỉ số meta.
+
+Bảy chỉ số meta là `META_KEYS`: tốc xoay nòng · tầm bắn · tốc độ đạn · băng đạn gốc · bán
+kính nhặt · hệ số vàng · hệ số kinh nghiệm.
+
+Lý do: hai hệ chồng lên cùng một chỉ số thì nhân chồng nhân và cân bằng vỡ ngay; tệ hơn là
+người chơi mua súng sao cao xong mở ván thấy nửa cây nâng cấp thành vô nghĩa. Tách ra thì
+chỉnh hệ này không phải đo lại hệ kia.
+
+### Súng và phụ kiện
+
+| | Mở khoá | Nâng sao |
+|---|---|---|
+| Súng (`GUNS`) | vàng — 0 / 2.500 / 6.000 / 14.000 / 25.000 | vàng, `starBase × (sao+1)` |
+| Phụ kiện (`ACC`) | kim cương — 20 đến 40 | vàng, `starBase × (sao+1)` |
+
+Súng mở bằng vàng chứ không phải kim cương là chủ ý: kim cương hiện chỉ đến từ lần đầu dọn
+sạch một khu vực, nên nếu súng cần kim cương thì người chơi kẹt cứng ở khu vực 2. Vàng thì
+ván nào cũng có.
+
+Mỗi khẩu có `starGain` riêng — SMG lên sao được băng đạn và tốc xoay, Sniper lên sao được
+tầm và tốc đạn — nên nâng sao có tính cách chứ không phải cùng một cục phần trăm.
+
+Phụ kiện mỗi món đẩy **đúng một** chỉ số, nhân thêm `1 + 0,35 × sao`. Ba ô trang bị. Đầy ô
+thì hệ thống từ chối chứ không lặng lẽ tháo món cũ — người chơi phải tự thấy mình bỏ cái gì.
+
+Ván mới chỉ cầm được khẩu đã mua (`ownedGuns()`), nên hồ sơ trắng bắt đầu bằng mỗi SMG và
+nút đổi súng tự ẩn.
 
 ## Cây nâng cấp
 
@@ -251,7 +285,7 @@ npm run all
 | `boss.mjs` | Luồng cuối màn: trùm phụ → vòng vây → elite → hộp → trùm chính → thắng |
 | `arena.mjs` | Vòng vây kẹp đúng bán kính, mũi tên chỉ hộp |
 | `visual.mjs` | Chụp toàn trang: HUD, bảng Tune, menu nâng cấp, đổi ngôn ngữ giữa menu |
-| `meta.mjs` | Sảnh, ví, thang khu vực: khoá/mở, đọc ghi `localStorage`, hồ sơ hỏng và hồ sơ phiên bản cũ |
+| `meta.mjs` | Sảnh, ví, thang khu vực và cửa hàng: khoá/mở, mua súng, nâng sao, ba ô phụ kiện, hồ sơ hỏng và hồ sơ phiên bản cũ |
 | `themes.mjs` | Chụp ba khu vực ở cùng thời điểm để so sánh |
 | `survive.mjs` | **Tắt bất tử**, 3 lượt, đo bot sống được bao lâu. Nhận đường dẫn file khác làm tham số để so hai phiên bản |
 
@@ -276,7 +310,7 @@ script của game qua `vm`. Nhanh và hợp cho CI. Nhưng nó *không* thấy �
 - Nhân vật, thây đi và thây chạy đã có sprite thật (Quaternius). Elite, trùm phụ và trùm
   chính vẫn vẽ tay vì bộ art chưa có biến thể phân biệt được bằng màu.
 - Khu vực khác nhau ở bảng màu và vật trang trí, chưa có ảnh lát nền.
-- Chưa có cửa hàng súng / phụ kiện / nâng sao, chưa có rương, quảng cáo thưởng hay IAP.
+- Chưa có rương, quảng cáo thưởng hay IAP — mới có cửa hàng súng và phụ kiện.
   Bảng cân bằng hiện tại (`hpScale` ×1→×1,9 · trùm chính 3.800 · trùm phụ 1.600) được đặt
   cho người chơi **tay không** ở Nông trại; khi có hệ sao thì phải nâng lại toàn bộ.
 - Số đếm rương miễn phí mỗi ngày **bắt buộc** phải theo đồng hồ máy chủ. Đồng hồ máy người

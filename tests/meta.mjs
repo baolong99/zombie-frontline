@@ -73,6 +73,83 @@ await page.waitForTimeout(400);
 ok(await page.$eval("#w-gold", e => e.textContent) === "77", "hồ sơ v0 được nâng cấp, giữ vàng");
 ok(!(await areas())[1].locked, "hồ sơ v0 giữ được khu vực đã qua");
 
+// --- cửa hàng: mua súng, nâng sao, mua và đeo phụ kiện
+await page.evaluate(() => localStorage.setItem("zf_profile", JSON.stringify(
+  { v:2, gold:10000, gem:100, cleared:{}, best:{}, runs:0, guns:{}, acc:{}, equip:[] })));
+await page.reload();
+await page.waitForTimeout(400);
+
+const rows = (sel) => page.$$eval(sel + " .srow", els => els.map(e => ({
+  name: e.querySelector(".s-name").textContent.trim(),
+  note: e.querySelector(".s-note").textContent.trim(),
+  acts: [...e.querySelectorAll(".s-btn")].map(b => ({ label:b.textContent.trim(), off:b.disabled }))
+})));
+const gold = () => page.$eval("#w-gold", e => +e.textContent);
+const gem  = () => page.$eval("#w-gem",  e => +e.textContent);
+
+await page.$eval('.tab[data-tab="guns"]', e => e.click());
+let g = await rows("#gunlist");
+ok(g.length === 5, "tab Súng liệt kê 5 khẩu");
+ok(g[0].acts[0].label.indexOf("Nâng sao") === 0, "SMG có sẵn nên chỉ nâng sao được");
+ok(g[4].acts[0].off, "Sniper 25.000 vượt quá 10.000 vàng nên nút bị khoá");
+
+// mua Rifle 2.500
+await page.$$eval("#gunlist .srow .s-btn", els => els[1].click());
+ok(await gold() === 7500, "mua Rifle trừ đúng 2.500 (còn " + (await gold()) + ")");
+g = await rows("#gunlist");
+ok(g[1].acts[0].label.indexOf("Nâng sao") === 0, "mua xong Rifle chuyển sang nâng sao");
+
+// nâng sao Rifle: 800 cho sao đầu
+await page.$$eval("#gunlist .srow .s-btn", els => els[1].click());
+ok(await gold() === 6700, "sao đầu của Rifle tốn 800 (còn " + (await gold()) + ")");
+ok((await rows("#gunlist"))[1].name.indexOf("★") > 0, "Rifle hiện một sao");
+
+// --- phụ kiện: mua bằng kim cương, nâng sao bằng vàng, giới hạn 3 ô
+await page.$eval('.tab[data-tab="acc"]', e => e.click());
+let acl = await rows("#acclist");
+ok(acl.length === 7, "tab Phụ kiện liệt kê 7 món");
+for (let i = 0; i < 4; i++){
+  const list = await rows("#acclist");
+  const idx = list.findIndex(r => r.acts[0].label.indexOf("Mua") === 0);
+  await page.$$eval("#acclist .srow", (els, k) => els[k].querySelector(".s-btn").click(), idx);
+}
+ok(await gem() === 100 - (25 + 25 + 30 + 20), "mua 4 phụ kiện trừ đúng kim cương (còn " + (await gem()) + ")");
+
+// đeo 3 món rồi món thứ tư phải bị từ chối
+for (let i = 0; i < 4; i++){
+  const list = await rows("#acclist");
+  const idx = list.findIndex(r => r.acts[0].label === "Đeo" && !r.acts[0].off);
+  if (idx < 0) break;
+  await page.$$eval("#acclist .srow", (els, k) => els[k].querySelector(".s-btn").click(), idx);
+}
+const equipped = await page.evaluate(() => JSON.parse(localStorage.getItem("zf_profile")).equip);
+ok(equipped.length === 3, "chỉ đeo được 3 món (đang đeo " + equipped.length + ")");
+ok((await rows("#acclist")).some(r => r.acts[0].label === "Đeo" && r.acts[0].off),
+   "món thứ tư có nút Đeo nhưng bị khoá");
+
+// --- hệ số meta phải tới được trong ván
+await page.$eval("#btn-start", e => e.click());
+await page.waitForTimeout(500);
+s = await st();
+ok(s.weapon.id === "smg", "vào ván cầm khẩu đang sở hữu đầu tiên");
+const base = { range:340, mag:40 };
+ok(s.weapon.range > base.range || s.weapon.mag > base.mag,
+   "chỉ số meta có tác dụng: tầm " + s.weapon.range + " băng " + s.weapon.mag);
+
+// --- khẩu chưa mua không được cầm, kể cả khi bấm thẳng phím số của nó
+await page.keyboard.press("Digit5");            // Sniper, chưa mua
+await page.waitForTimeout(80);
+s = await st();
+ok(s.weapon.id === "smg", "phím 5 không cầm được Sniper chưa mua (đang cầm " + s.weapon.id + ")");
+await page.keyboard.press("Digit2");            // Rifle, đã mua
+await page.waitForTimeout(80);
+ok((await st()).weapon.id === "rifle", "phím 2 cầm được Rifle đã mua");
+const ids = new Set();
+for (let i = 0; i < 6; i++){ await page.keyboard.press("KeyQ"); await page.waitForTimeout(70);
+                             ids.add((await st()).weapon.id); }
+ok([...ids].every(x => x === "smg" || x === "rifle"),
+   "Q chỉ xoay trong khẩu đã mua (thấy " + [...ids].join(",") + ")");
+
 ok(errors.length === 0, "không có lỗi trang: " + (errors[0] || ""));
 await browser.close();
 console.log(fails ? "meta: " + fails + " lỗi" : "meta: tất cả đạt");

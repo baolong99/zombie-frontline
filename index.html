@@ -186,6 +186,34 @@
   .areabtn.on{border-color:var(--toxic); color:var(--toxic); background:rgba(142,230,74,.1)}
   .areabtn:disabled{opacity:.4; cursor:not-allowed}
   .areabtn.done i{color:var(--toxic); opacity:.9}
+  .tabs{display:flex; gap:6px; margin:12px 0 2px}
+  .tab{flex:1; padding:8px 4px; border:1px solid var(--line2); border-radius:4px;
+    background:transparent; color:var(--ink2); cursor:pointer;
+    font:700 11px/1 var(--f-mono); letter-spacing:.05em; text-transform:uppercase}
+  .tab:hover{color:var(--toxic)}
+  .tab.on{border-color:var(--toxic); color:var(--toxic); background:rgba(142,230,74,.1)}
+  .shoplist{display:flex; flex-direction:column; gap:6px; margin:12px 0 16px;
+    max-height:min(46vh,340px); overflow-y:auto; padding-right:6px;
+    scrollbar-width:thin; scrollbar-color:var(--line2) transparent}
+  .shoplist::-webkit-scrollbar{width:6px}
+  .shoplist::-webkit-scrollbar-thumb{background:var(--line2); border-radius:3px}
+  .srow{display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center;
+    padding:9px 10px; border:1px solid var(--line2); border-radius:4px; background:var(--panel2);
+    text-align:left}
+  .srow.equipped{border-color:var(--toxic); background:rgba(142,230,74,.08)}
+  .srow.locked{opacity:.62}
+  .s-name{font:700 12px/1.2 var(--f-mono); color:#eaf6ea}
+  .s-note{font:500 10px/1.35 var(--f-mono); color:var(--ink2); margin-top:3px}
+  .s-star{font:700 11px/1 var(--f-mono); color:#ffcf49; letter-spacing:.12em; margin-left:6px}
+  .s-star u{color:rgba(255,255,255,.18); text-decoration:none}
+  .s-acts{display:flex; flex-direction:column; gap:4px; align-items:stretch}
+  .s-btn{padding:6px 9px; border:1px solid var(--line2); border-radius:3px; background:transparent;
+    color:var(--ink2); cursor:pointer; white-space:nowrap; font:700 10px/1 var(--f-mono)}
+  .s-btn:hover:not(:disabled){border-color:var(--toxic); color:var(--toxic)}
+  .s-btn:disabled{opacity:.35; cursor:not-allowed}
+  .s-btn.buy{color:#ffcf49; border-color:rgba(255,207,73,.4)}
+  .s-btn.gem{color:#6fd6ff; border-color:rgba(111,214,255,.4)}
+  .s-empty{font:500 11px/1.5 var(--f-mono); color:var(--ink2); text-align:center; padding:14px 0}
   /* Thông báo vòng vây phải nằm trên mọi lớp HUD: cột chip nâng cấp bên trái dài dần theo
      trận và tới cuối màn nó cắt ngang đúng chỗ này. Vẽ trên canvas thì luôn bị chip đè. */
   .arenamsg{position:absolute; left:0; right:0; top:26%; z-index:40; pointer-events:none;
@@ -325,18 +353,27 @@
         </div>
         <div class="kicker" data-i18n="start.kicker">Prototype · Khu vực 1 · 10 phút</div>
         <h1>Zombie Frontline</h1>
-        <p data-i18n-html="start.body"></p>
-        <div class="keyguide">
-          <div><b data-i18n="start.g1t"></b><span data-i18n="start.g1d"></span></div>
-          <div><b data-i18n="start.g2t"></b><span data-i18n="start.g2d"></span></div>
-          <div><b data-i18n="start.g3t"></b><span data-i18n="start.g3d"></span></div>
-          <div><b data-i18n="start.g4t"></b><span data-i18n="start.g4d"></span></div>
+        <div id="startintro">
+          <p data-i18n-html="start.body"></p>
+          <div class="keyguide">
+            <div><b data-i18n="start.g1t"></b><span data-i18n="start.g1d"></span></div>
+            <div><b data-i18n="start.g2t"></b><span data-i18n="start.g2d"></span></div>
+            <div><b data-i18n="start.g3t"></b><span data-i18n="start.g3d"></span></div>
+            <div><b data-i18n="start.g4t"></b><span data-i18n="start.g4d"></span></div>
+          </div>
         </div>
         <div class="purse">
           <span class="coin">◆</span><b id="w-gold">0</b>
           <span class="gemi">◈</span><b id="w-gem">0</b>
         </div>
+        <div class="tabs" id="lobbytabs">
+          <button class="tab on" type="button" data-tab="areas" data-i18n="tab.areas">Khu vực</button>
+          <button class="tab" type="button" data-tab="guns" data-i18n="tab.guns">Súng</button>
+          <button class="tab" type="button" data-tab="acc" data-i18n="tab.acc">Phụ kiện</button>
+        </div>
         <div class="arealist" id="arealist"></div>
+        <div class="shoplist" id="gunlist" hidden></div>
+        <div class="shoplist" id="acclist" hidden></div>
         <button class="btn" id="btn-start" type="button" data-i18n="start.btn">Bắt đầu</button>
       </div>
     </div>
@@ -530,7 +567,7 @@
       "sub.crate":"Nhặt hộp nâng cấp", "sub.next":"{what} · {time}",
       "sub.miniName":"Trùm phụ", "sub.eliteName":"Elite", "sub.last":"Hạ nốt elite cuối",
       "hint.l1":"<kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> hoặc <kbd>WASD</kbd> di chuyển · súng tự khoá zombie gần nhất trong 180° trước mặt",
-      "hint.l2":"<kbd>1</kbd>–<kbd>5</kbd> / <kbd>Q</kbd> đổi súng · <kbd>P</kbd> tạm dừng · chạy qua hộp vàng để mở nâng cấp cao cấp, qua bình máu và nam châm để nhặt",
+      "hint.l2":"<kbd>1</kbd>–<kbd>5</kbd> / <kbd>Q</kbd> đổi súng (chỉ khẩu đã mua) · <kbd>P</kbd> tạm dừng · chạy qua hộp vàng để mở nâng cấp cao cấp, qua bình máu và nam châm để nhặt",
 
       "start.kicker":"Prototype · Khu vực 1 · 10 phút",
       "start.body":"Không có hỗ trợ ngắm — đạn bay đúng theo nòng. Nhân vật <b>tự khoá zombie gần nhất trong 180° trước mặt</b>, trước mặt sạch thì tự quay ra sau. Mỗi khẩu súng có tốc độ xoay riêng, khẩu càng mạnh càng quay chậm.",
@@ -589,6 +626,16 @@
       "area.road":"Quốc lộ", "area.camp":"Trại tị nạn", "area.nest":"Ổ dịch",
       "area.locked":"chưa mở", "area.done":"đã sạch · {n} diệt", "area.hp":"máu quái ×{n}",
       "stat.gem":"Kim cương",
+      "tab.areas":"Khu vực", "tab.guns":"Súng", "tab.acc":"Phụ kiện",
+      "shop.buy":"Mua {n} ◆", "shop.buyGem":"Mua {n} ◈", "shop.star":"Nâng sao {n} ◆",
+      "shop.max":"Tối đa", "shop.locked":"chưa sở hữu",
+      "shop.equip":"Đeo", "shop.unequip":"Tháo", "shop.slots":"Ô trang bị {n}/{m}",
+      "meta.turn":"tốc xoay nòng", "meta.range":"tầm bắn", "meta.bspeed":"tốc độ đạn",
+      "meta.mag":"băng đạn", "meta.pickup":"bán kính nhặt", "meta.gold":"vàng rơi",
+      "meta.xp":"kinh nghiệm", "meta.none":"chưa có hệ số nào",
+      "acc.scope":"Ống Ngắm", "acc.pouch":"Túi Đạn", "acc.gyro":"Giá Xoay",
+      "acc.sabot":"Đầu Đạn Nhẹ", "acc.boots":"Giày Trinh Sát", "acc.coin":"Túi Tiền",
+      "acc.tag":"Thẻ Quân Nhân",
       "panel.arena":"Bán kính vòng vây",
       "panel.arenaNote":"Trùm cuối xuất hiện là quái thường chết sạch và người chơi bị nhốt trong vòng bán kính này.",
       "boss.name":"Bạo Chúa",
@@ -664,7 +711,7 @@
       "sub.crate":"Grab the crate", "sub.next":"{what} · {time}",
       "sub.miniName":"Mini-boss", "sub.eliteName":"Elite", "sub.last":"Finish the last elite",
       "hint.l1":"<kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> or <kbd>WASD</kbd> to move · the gun auto-locks the nearest zombie inside the 180° front arc",
-      "hint.l2":"<kbd>1</kbd>–<kbd>5</kbd> / <kbd>Q</kbd> swap gun · <kbd>P</kbd> pause · walk over the gold crate for an advanced upgrade, over medkits and magnets to grab them",
+      "hint.l2":"<kbd>1</kbd>–<kbd>5</kbd> / <kbd>Q</kbd> swap gun (owned only) · <kbd>P</kbd> pause · walk over the gold crate for an advanced upgrade, over medkits and magnets to grab them",
 
       "start.kicker":"Prototype · Zone 1 · 10 minutes",
       "start.body":"No aim assist — bullets fly exactly where the barrel points. Your character <b>locks the nearest zombie inside the 180° front arc</b>, and turns around on its own once the front is clear. Every gun swings at its own speed: the harder it hits, the slower it turns.",
@@ -723,6 +770,16 @@
       "area.road":"Highway", "area.camp":"Refugee Camp", "area.nest":"The Nest",
       "area.locked":"locked", "area.done":"cleared · {n} kills", "area.hp":"zombie HP ×{n}",
       "stat.gem":"Gems",
+      "tab.areas":"Areas", "tab.guns":"Guns", "tab.acc":"Gear",
+      "shop.buy":"Buy {n} ◆", "shop.buyGem":"Buy {n} ◈", "shop.star":"Star up {n} ◆",
+      "shop.max":"Maxed", "shop.locked":"not owned",
+      "shop.equip":"Equip", "shop.unequip":"Remove", "shop.slots":"Gear slots {n}/{m}",
+      "meta.turn":"turn rate", "meta.range":"range", "meta.bspeed":"bullet speed",
+      "meta.mag":"magazine", "meta.pickup":"pickup radius", "meta.gold":"gold drops",
+      "meta.xp":"xp gain", "meta.none":"no modifiers yet",
+      "acc.scope":"Scope", "acc.pouch":"Ammo Pouch", "acc.gyro":"Gyro Mount",
+      "acc.sabot":"Light Sabot", "acc.boots":"Scout Boots", "acc.coin":"Coin Purse",
+      "acc.tag":"Dog Tag",
       "panel.arena":"Arena radius",
       "panel.arenaNote":"When the final boss lands, every ordinary zombie dies at once and you are sealed inside a ring this wide.",
       "boss.name":"The Tyrant",
@@ -814,7 +871,7 @@
     try { localStorage.setItem("zf_lang", l); } catch(e){}
     applyI18n();
     refreshNotes();
-    renderAreas();
+    renderLobby();
     if (G){
       renderUpStack();
       updateHUD();
@@ -867,6 +924,47 @@
   ];
   var STEADY_AFTER = 0.5;
   WEAPONS.forEach(function(w){ w.dps = Math.round(w.dmg * w.pellets / w.rate); });
+
+  // ---- CỬA HÀNG: bảy chỉ số meta, và chỉ bảy chỉ số này.
+  //
+  // QUY TẮC TÁCH ĐÔI. Cửa hàng KHÔNG được đụng vào sát thương, tốc bắn, xuyên, nảy, hút
+  // máu hay số tia — đó là sân riêng của cây nâng cấp trong ván. Cửa hàng chỉ đẩy bảy
+  // chỉ số dưới đây, và cây nâng cấp không đẩy cái nào trong số đó.
+  //
+  // Lý do: hai hệ chồng lên cùng một chỉ số thì nhân chồng nhân, cân bằng vỡ, và tệ hơn
+  // là người chơi mua súng sao cao xong thấy nửa cây nâng cấp thành vô nghĩa. Tách ra thì
+  // chỉnh hệ này không phải đo lại hệ kia.
+  var META_KEYS = ["turn", "range", "bspeed", "mag", "pickup", "gold", "xp"];
+  function metaBase(){
+    var m = {};
+    for (var i = 0; i < META_KEYS.length; i++) m[META_KEYS[i]] = 1;
+    return m;
+  }
+
+  // Súng mở khoá bằng VÀNG, nâng sao bằng VÀNG. Vàng kiếm được mỗi ván nên không bao giờ
+  // tắc đường; kim cương để dành cho phụ kiện, thứ có thể không mua cũng chơi được.
+  // starGain là phần CỘNG THÊM vào hệ số ×1 cho mỗi sao, nên ★★★★★ của SMG là băng ×1,6.
+  var GUNS = {
+    smg:     { cost:0,     starBase:500,  starGain:{ mag:0.12, turn:0.06 } },
+    rifle:   { cost:2500,  starBase:800,  starGain:{ range:0.08, bspeed:0.06 } },
+    shotgun: { cost:6000,  starBase:1200, starGain:{ mag:0.14, turn:0.08 } },
+    minigun: { cost:14000, starBase:1800, starGain:{ turn:0.10, mag:0.10 } },
+    sniper:  { cost:25000, starBase:2600, starGain:{ range:0.10, bspeed:0.08 } }
+  };
+  var MAX_STAR = 5;
+
+  // Phụ kiện mở khoá bằng KIM CƯƠNG, nâng sao bằng vàng. Mỗi món đẩy đúng một chỉ số —
+  // đọc bảng là biết ngay mình mua gì, không phải cộng trừ trong đầu.
+  var ACC = {
+    scope: { stat:"range",  gain:0.20, gem:25, starBase:700 },
+    pouch: { stat:"mag",    gain:0.30, gem:25, starBase:700 },
+    gyro:  { stat:"turn",   gain:0.25, gem:30, starBase:800 },
+    sabot: { stat:"bspeed", gain:0.25, gem:20, starBase:600 },
+    boots: { stat:"pickup", gain:0.30, gem:20, starBase:600 },
+    coin:  { stat:"gold",   gain:0.30, gem:40, starBase:900 },
+    tag:   { stat:"xp",     gain:0.25, gem:40, starBase:900 }
+  };
+  var ACC_SLOTS = 3;
 
   var ZTYPE = {
     walker: { hp:42, speed:52,  r:13, dmg:9, color:"#6f9a5c", dark:"#3c5733", touch:0.7, xp:3 },
@@ -957,8 +1055,9 @@
   // ví nằm ở máy người chơi thì sửa trong năm giây. Nếu để rải rác "G.gold += 400" khắp
   // nơi như trước thì tới lúc đó phải mò lại toàn bộ.
   var PROFILE_KEY = "zf_profile";
-  var PROFILE_V = 1;
-  var P = { v:PROFILE_V, gold:0, gem:0, cleared:{}, best:{}, runs:0 };
+  var PROFILE_V = 2;
+  var P = { v:PROFILE_V, gold:0, gem:0, cleared:{}, best:{}, runs:0,
+            guns:{}, acc:{}, equip:[] };
 
   function loadProfile(){
     try {
@@ -970,7 +1069,13 @@
       for (var k in P) if (k in raw) P[k] = raw[k];
     } catch(e){}
   }
-  function migrateProfile(raw){ raw.v = PROFILE_V; return raw; }
+  function migrateProfile(raw){
+    // v1 -> v2: chưa có kho súng và phụ kiện. Để trống là đủ — gunEntry() tự dựng mục
+    // thiếu, và SMG mặc định đã có sẵn, nên người chơi cũ không mất gì.
+    if (!(raw.v >= 2)){ raw.guns = raw.guns || {}; raw.acc = raw.acc || {}; raw.equip = raw.equip || []; }
+    raw.v = PROFILE_V;
+    return raw;
+  }
   function saveProfile(){
     try { localStorage.setItem(PROFILE_KEY, JSON.stringify(P)); } catch(e){}
   }
@@ -996,7 +1101,72 @@
       return true;
     }
   };
+  // ---- kho đồ và cửa hàng. Mọi lần trừ tiền đều qua wallet.spend, không có ngoại lệ.
+  function gunEntry(id){
+    if (!P.guns[id]) P.guns[id] = { own:(GUNS[id] && GUNS[id].cost === 0), star:0 };
+    return P.guns[id];
+  }
+  function accEntry(id){
+    if (!P.acc[id]) P.acc[id] = { own:false, star:0 };
+    return P.acc[id];
+  }
+  function starCost(base, star){ return base * (star + 1); }
+
+  var shop = {
+    buyGun: function(id){
+      var d = GUNS[id], e = gunEntry(id);
+      if (!d || e.own) return false;
+      if (!wallet.spend("gold", d.cost, "mua_súng_" + id)) return false;
+      e.own = true; saveProfile(); return true;
+    },
+    starGun: function(id){
+      var d = GUNS[id], e = gunEntry(id);
+      if (!d || !e.own || e.star >= MAX_STAR) return false;
+      if (!wallet.spend("gold", starCost(d.starBase, e.star), "sao_súng_" + id)) return false;
+      e.star++; saveProfile(); return true;
+    },
+    buyAcc: function(id){
+      var d = ACC[id], e = accEntry(id);
+      if (!d || e.own) return false;
+      if (!wallet.spend("gem", d.gem, "mua_phụ_kiện_" + id)) return false;
+      e.own = true; saveProfile(); return true;
+    },
+    starAcc: function(id){
+      var d = ACC[id], e = accEntry(id);
+      if (!d || !e.own || e.star >= MAX_STAR) return false;
+      if (!wallet.spend("gold", starCost(d.starBase, e.star), "sao_phụ_kiện_" + id)) return false;
+      e.star++; saveProfile(); return true;
+    },
+    // Bật/tắt một ô trang bị. Đầy ô thì từ chối chứ không lặng lẽ đá món cũ ra —
+    // người chơi phải tự thấy mình đang bỏ cái gì.
+    toggleEquip: function(id){
+      if (!accEntry(id).own) return false;
+      var at = P.equip.indexOf(id);
+      if (at >= 0) P.equip.splice(at, 1);
+      else if (P.equip.length >= ACC_SLOTS) return false;
+      else P.equip.push(id);
+      saveProfile(); return true;
+    }
+  };
+
+  // Hệ số meta của khẩu súng id: sao của khẩu đó cộng với phụ kiện đang đeo.
+  function metaFor(id){
+    var m = metaBase(), d = GUNS[id], k;
+    if (d){
+      var st = gunEntry(id).star;
+      for (k in d.starGain) m[k] += d.starGain[k] * st;
+    }
+    for (var i = 0; i < P.equip.length; i++){
+      var a = ACC[P.equip[i]], e = P.acc[P.equip[i]];
+      if (!a || !e || !e.own) continue;
+      m[a.stat] += a.gain * (1 + 0.35 * e.star);
+    }
+    return m;
+  }
+
   loadProfile();
+  // hồ sơ cũ có thể ghi tên món đã bị gỡ khỏi bảng, hoặc đeo quá số ô cho phép
+  P.equip = P.equip.filter(function(id){ return ACC[id] && accEntry(id).own; }).slice(0, ACC_SLOTS);
 
   // ================================================================ setup
   var $ = function(id){ return document.getElementById(id); };
@@ -1040,23 +1210,37 @@
       target:null, rearLock:false,
       pending:[], curPick:null,
       up:{},
+      // goldAcc giữ phần lẻ của hệ số vàng. Không có nó thì mỗi đồng 1 vàng ×1,3 làm
+      // tròn xuống lại thành 1, và phụ kiện Túi Tiền thành vô tác dụng hoàn toàn.
+      meta:metaBase(), goldAcc:0,
       player:{ x:0, y:0, r:14, a:-Math.PI/2, hp:100, maxhp:100,
-               iframe:0, wi:0, spin:0, muzzle:0, stillT:0, shieldUp:false, shieldT:0, regenT:25,
+               iframe:0, wi:firstOwned(), spin:0, muzzle:0, stillT:0, shieldUp:false, shieldT:0, regenT:25,
                moveA:null, anim:"idle", ft:0,
                hot:0, slugN:0, undyT:0 },
       guns: WEAPONS.map(function(w){ return { ammo:w.mag, reloadT:0, cool:0 }; }),
       zombies:[], corpses:[], bullets:[], waves:[], parts:[], nums:[], orbs:[], items:[], crates:[], rings:[], markers:[],
       spawnT:0
     };
+    G.meta = metaFor(WEAPONS[G.player.wi].id);
     renderUpStack();
     updateHUD();
   }
+
+  // Chỉ những khẩu đã mua mới cầm được. Luôn trả về ít nhất một chỉ số: SMG giá 0 nên
+  // về lý không bao giờ mất, nhưng hồ sơ hỏng thì thà cầm SMG còn hơn treo game.
+  function ownedGuns(){
+    var out = [];
+    for (var i = 0; i < WEAPONS.length; i++) if (gunEntry(WEAPONS[i].id).own) out.push(i);
+    return out.length ? out : [0];
+  }
+  function firstOwned(){ return ownedGuns()[0]; }
 
   function uni(){ return G && G.unique ? UNIQUES[G.unique] : null; }
 
   // Mỗi node bằng khoảng ba cấp của hệ cũ, vì cả ván chỉ mở được chừng mười node.
   function wstat(i){
     var w = WEAPONS[i], U = uni() || {};
+    var M = metaFor(w.id);            // sao súng + phụ kiện, không đụng vào sát thương/tốc bắn
     var rate = w.rate / (has("rate") ? 1.70 : 1);
     if (has("hotload") && G.player.hot > 0) rate /= 2;   // vừa thay đạn xong: nhịp bắn gấp đôi
     if (U.fireMul) rate /= U.fireMul;
@@ -1074,8 +1258,8 @@
     var lines = 1 + (has("multi") ? 2 : 0) + (has("stormfx") ? 2 : 0) + (U.linesAdd || 0);
     var pellets = w.pellets;
     var pierce = w.pierce + (has("pierce") ? 3 : 0);
-    var mag = Math.round(w.mag * (has("mag") ? 2.5 : 1));
-    var range = w.range;
+    var mag = Math.max(1, Math.round(w.mag * M.mag * (has("mag") ? 2.5 : 1)));
+    var range = w.range * M.range;
     var bounce = has("bounce") ? 3 : 0;
     var rebound = 0;
     // Xuyên Phá: băng đạn khoá ở 1 viên, nhưng viên đó xuyên hết và bay hết bản đồ.
@@ -1095,7 +1279,8 @@
       range = 4000;
     }
 
-    return { base:w, turn:w.turn * T.turnMul, arc:T.frontArc,
+    return { base:w, turn:w.turn * T.turnMul * M.turn, arc:T.frontArc,
+             bspeed:w.bspeed * M.bspeed, meta:M,
              rate:rate, dmg:dmg, rad:rad, lines:lines, pellets:pellets,
              rear:has("rear") ? 2 : 0, pierce:pierce, bounce:bounce, rebound:rebound,
              steady:w.steady || 0, mag:mag, range:range, reload:reload };
@@ -1181,9 +1366,16 @@
     return { x:stick.dx/l, y:stick.dy/l, m:Math.min(1, (l - 0.22) / 0.62) };
   }
   function setWeapon(i){
-    if (!G || i === G.player.wi || i >= WEAPONS.length) return;
+    if (!G || i === G.player.wi || i < 0 || i >= WEAPONS.length) return;
+    if (!gunEntry(WEAPONS[i].id).own) return;
     G.player.wi = i; G.player.spin = 0;
+    G.meta = metaFor(WEAPONS[i].id);   // sao của từng khẩu khác nhau, đổi súng là đổi hệ số
     syncWeaponUI();
+  }
+  // Q/E xoay vòng trong số khẩu đã mua, không rơi vào ô trống
+  function nextOwned(){
+    var own = ownedGuns(), at = own.indexOf(G.player.wi);
+    return own[(at + 1) % own.length];
   }
 
   // ================================================================ audio
@@ -1389,9 +1581,11 @@
 
   // ================================================================ targeting
   function aimAt(z){
-    var p = G.player, w = WEAPONS[p.wi];
+    var p = G.player;
     var dist = Math.hypot(z.x - p.x, z.y - p.y);
-    var tt = (dist / w.bspeed) * T.lead;
+    // phải là tốc độ đạn ĐÃ nhân hệ số meta, không phải số gốc của khẩu súng: đạn nhanh
+    // hơn mà vẫn ngắm đón như cũ thì bắn trượt ra phía trước mục tiêu
+    var tt = (dist / wstat(p.wi).bspeed) * T.lead;
     return Math.atan2((z.y + z.vy * tt) - p.y, (z.x + z.vx * tt) - p.x);
   }
   function pickTarget(arcDeg){
@@ -1472,7 +1666,7 @@
   }
   function shoot(x, y, a, ws, mul, extra){
     if (G.bullets.length > 460) return;
-    var b = { x:x, y:y, vx:Math.cos(a)*ws.base.bspeed, vy:Math.sin(a)*ws.base.bspeed,
+    var b = { x:x, y:y, vx:Math.cos(a)*ws.bspeed, vy:Math.sin(a)*ws.bspeed,
       dmg:ws.dmg * (mul || 1), left:ws.range, range:ws.range, pierce:ws.pierce, pierceLeft:ws.pierce,
       bounce:ws.bounce, rebound:ws.rebound || 0,
       rad:ws.rad, kb:ws.base.kb, c:ws.base.color, trail:ws.base.trail,
@@ -1570,7 +1764,7 @@
       ring(z.x, z.y, 120, "rgba(255,83,71,.95)");
       // Cộng thẳng vào ví chứ không rơi xuống đất: win() chạy ngay dòng dưới, đồng vàng nằm
       // dưới đất sẽ không bao giờ nhặt được và bảng tổng kết cũng không tính nó.
-      G.gold += 400;
+      addGold(400);
       win();
       return;
     }
@@ -1651,6 +1845,13 @@
     for (var i = 0; i < n; i++)
       G.orbs.push({ x:x + rnd(-10,10), y:y + rnd(-10,10), v:amount / n,
                     vx:rnd(-40,40), vy:rnd(-40,40), homing:false, sp:0 });
+  }
+
+  // Cộng vàng qua hệ số meta, giữ phần lẻ lại cho lần sau nên không mất mát do làm tròn.
+  function addGold(v){
+    G.goldAcc += v * G.meta.gold;
+    var whole = Math.floor(G.goldAcc);
+    if (whole > 0){ G.goldAcc -= whole; G.gold += whole; }
   }
 
   function addItem(x, y, kind, v){
@@ -1734,12 +1935,12 @@
         G.curPick = { type:"elite", opts:ready, adv:G.adv };
       } else {
         var cn = nodePool();
-        if (!cn.length){ G.adv++; G.gold += 150; afterPick(); return; }
+        if (!cn.length){ G.adv++; addGold(150); afterPick(); return; }
         G.curPick = { type:"crate", opts:cn, adv:G.adv };
       }
     } else {
       var opts = nodePool();
-      if (!opts.length){ G.gold += 40; afterPick(); return; }
+      if (!opts.length){ addGold(40); afterPick(); return; }
       G.curPick = { type:"level", opts:opts, lvl:G.lvl };
     }
     renderPick();
@@ -1899,7 +2100,7 @@
     return Math.max(15, Math.round(25 + (90 * k + 34 * k * k) * T.xpCurve));
   }
   function gainXp(v){
-    G.xp += v;
+    G.xp += v * G.meta.xp;
     while (G.xp >= G.xpNext){
       G.xp -= G.xpNext;
       G.lvl++;
@@ -2054,7 +2255,7 @@
         }
       }
     }
-    if (pendingSwap){ setWeapon((p.wi + 1) % WEAPONS.length); pendingSwap = false; }
+    if (pendingSwap){ setWeapon(nextOwned()); pendingSwap = false; }
 
     // ---- movement
     var spd = T.pspeed * (has("vigor") ? 1.25 : 1);
@@ -2310,7 +2511,7 @@
     for (var oi = G.orbs.length - 1; oi >= 0; oi--){
       var o = G.orbs[oi];
       var odx = p.x - o.x, ody = p.y - o.y, od = Math.hypot(odx, ody) || 1;
-      if (!o.homing && od < 175) o.homing = true;
+      if (!o.homing && od < 175 * G.meta.pickup) o.homing = true;
       if (o.homing){
         o.sp = Math.min(1700, (o.sp || 320) + 3000 * dt);
         o.x += odx / od * o.sp * dt; o.y += ody / od * o.sp * dt;
@@ -2330,7 +2531,7 @@
       it.t += dt;
       var idx = p.x - it.x, idy = p.y - it.y, idd = Math.hypot(idx, idy) || 1;
       if (it.kind === "gold"){
-        if (!it.homing && idd < 175) it.homing = true;
+        if (!it.homing && idd < 175 * G.meta.pickup) it.homing = true;
         if (it.homing){
           it.sp = Math.min(1500, (it.sp || 280) + 2600 * dt);
           it.x += idx / idd * it.sp * dt; it.y += idy / idd * it.sp * dt;
@@ -2338,7 +2539,7 @@
           it.x += it.vx * dt; it.y += it.vy * dt; it.vx *= 0.9; it.vy *= 0.9;
         }
         if (idd < p.r + 13){
-          G.gold += it.v;
+          addGold(it.v);
           G.items.splice(ii, 1);
           blip(1280 + Math.random() * 90, 0.04, "sine", 0.022);
         }
@@ -2446,7 +2647,7 @@
     if (!P.best[a.k] || G.kills > P.best[a.k]) P.best[a.k] = G.kills;
     P.runs++;
     saveProfile();
-    renderAreas();
+    renderLobby();
     return { gold:earned, gem:gems };
   }
 
@@ -3468,7 +3669,8 @@
     if (!G) return;
     var i = G.player.wi, ws = wstat(i), w = WEAPONS[i], g = G.guns[i];
     $("w-name").textContent = w.name;
-    $("btn-swap-n").textContent = String(((i + 1) % WEAPONS.length) + 1);
+    $("btn-swap-n").textContent = String(nextOwned() + 1);
+    $("btn-swap").hidden = ownedGuns().length < 2;   // chỉ có một khẩu thì nút đổi súng vô nghĩa
     $("w-turn").textContent = Math.round(ws.turn) + "°/s";
     $("w-half").textContent = dec(180 / ws.turn, 2) + " s";
     // DPS thực tế phải cộng cả thời gian thay đạn, nếu không băng 1 viên sẽ hiện con số vô nghĩa
@@ -3553,9 +3755,142 @@
   bindRange("s-arena", "arenaR", function(v){ return Math.round(v) + " px"; });
 
   // ---- bảng chọn khu vực trên màn hình mở đầu
-  function renderAreas(){
+  // ---------------- sảnh: ví, khu vực, cửa hàng súng, cửa hàng phụ kiện
+  var lobbyTab = "areas";
+
+  function renderLobby(){
     $("w-gold").textContent = wallet.balance("gold");
     $("w-gem").textContent = wallet.balance("gem");
+    // Phần hướng dẫn phím chỉ có nghĩa ở tab xuất phát; để nguyên thì thẻ sảnh dài quá
+    // màn hình điện thoại và nút Bắt đầu trôi khỏi tầm nhìn.
+    $("startintro").hidden = lobbyTab !== "areas";
+    $("arealist").hidden = lobbyTab !== "areas";
+    $("gunlist").hidden = lobbyTab !== "guns";
+    $("acclist").hidden = lobbyTab !== "acc";
+    var tabs = $("lobbytabs").children;
+    for (var i = 0; i < tabs.length; i++)
+      tabs[i].classList.toggle("on", tabs[i].getAttribute("data-tab") === lobbyTab);
+    renderAreas();
+    renderGuns();
+    renderAcc();
+  }
+
+  function stars(n){
+    var on = "", off = "";
+    for (var i = 0; i < n; i++) on += "★";
+    for (var j = n; j < MAX_STAR; j++) off += "☆";
+    return { on:on, off:off };
+  }
+  // một dòng cửa hàng: tên + sao + ghi chú bên trái, các nút hành động bên phải
+  function srow(host, opt){
+    var row = document.createElement("div");
+    row.className = "srow" + (opt.cls ? " " + opt.cls : "");
+    var left = document.createElement("div");
+    var name = document.createElement("div");
+    name.className = "s-name";
+    name.textContent = opt.name;
+    if (opt.star !== undefined){
+      var st = stars(opt.star), sp = document.createElement("span");
+      sp.className = "s-star";
+      sp.textContent = st.on;
+      if (st.off){ var u = document.createElement("u"); u.textContent = st.off; sp.appendChild(u); }
+      name.appendChild(sp);
+    }
+    var note = document.createElement("div");
+    note.className = "s-note";
+    note.textContent = opt.note;
+    left.appendChild(name); left.appendChild(note);
+    var acts = document.createElement("div");
+    acts.className = "s-acts";
+    (opt.acts || []).forEach(function(a){
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "s-btn" + (a.cls ? " " + a.cls : "");
+      b.textContent = a.label;
+      b.disabled = !!a.off;
+      b.addEventListener("click", function(){
+        if (a.run()) { blip(900, 0.05, "square", 0.03); renderLobby(); }
+        else noise(0.12, 0.05, 900);
+      });
+      acts.appendChild(b);
+    });
+    row.appendChild(left); row.appendChild(acts);
+    host.appendChild(row);
+  }
+
+  function renderGuns(){
+    var host = $("gunlist");
+    if (!host) return;
+    host.innerHTML = "";
+    WEAPONS.forEach(function(w){
+      var d = GUNS[w.id], e = gunEntry(w.id);
+      var m = metaFor(w.id), acts = [];
+      if (!e.own){
+        acts.push({ label:t("shop.buy", { n:fmtN(d.cost) }), cls:"buy",
+                    off:wallet.balance("gold") < d.cost,
+                    run:function(){ return shop.buyGun(w.id); } });
+      } else if (e.star < MAX_STAR){
+        var c = starCost(d.starBase, e.star);
+        acts.push({ label:t("shop.star", { n:fmtN(c) }), cls:"buy",
+                    off:wallet.balance("gold") < c,
+                    run:function(){ return shop.starGun(w.id); } });
+      } else {
+        acts.push({ label:t("shop.max"), off:true, run:function(){ return false; } });
+      }
+      srow(host, { name:w.name, star:e.star, cls:e.own ? "" : "locked",
+                   note:e.own ? gunNote(w, m) : t("shop.locked"), acts:acts });
+    });
+  }
+  // Chỉ liệt kê những chỉ số khẩu này THỰC SỰ được sao đẩy, cộng thêm thứ phụ kiện đang
+  // đẩy. Liệt kê cả bảy chỉ số thì dòng nào cũng giống dòng nào và không ai đọc.
+  function gunNote(w, m){
+    var out = [], seen = {}, k;
+    for (k in GUNS[w.id].starGain) seen[k] = 1;
+    for (var i = 0; i < P.equip.length; i++) if (ACC[P.equip[i]]) seen[ACC[P.equip[i]].stat] = 1;
+    for (k in seen){
+      if (k === "gold" || k === "xp" || k === "pickup") continue;
+      out.push(t("meta." + k) + " ×" + dec(m[k], 2));
+    }
+    return out.length ? out.join(" · ") : t("meta.none");
+  }
+
+  function renderAcc(){
+    var host = $("acclist");
+    if (!host) return;
+    host.innerHTML = "";
+    var slots = document.createElement("div");
+    slots.className = "s-empty";
+    slots.textContent = t("shop.slots", { n:P.equip.length, m:ACC_SLOTS });
+    host.appendChild(slots);
+    for (var id in ACC) (function(id){
+      var d = ACC[id], e = accEntry(id);
+      var on = P.equip.indexOf(id) >= 0;
+      var val = d.gain * (1 + 0.35 * e.star), acts = [];
+      if (!e.own){
+        acts.push({ label:t("shop.buyGem", { n:d.gem }), cls:"gem",
+                    off:wallet.balance("gem") < d.gem,
+                    run:function(){ return shop.buyAcc(id); } });
+      } else {
+        acts.push({ label:t(on ? "shop.unequip" : "shop.equip"),
+                    off:!on && P.equip.length >= ACC_SLOTS,
+                    run:function(){ return shop.toggleEquip(id); } });
+        if (e.star < MAX_STAR){
+          var c = starCost(d.starBase, e.star);
+          acts.push({ label:t("shop.star", { n:fmtN(c) }), cls:"buy",
+                      off:wallet.balance("gold") < c,
+                      run:function(){ return shop.starAcc(id); } });
+        }
+      }
+      srow(host, { name:t("acc." + id), star:e.star,
+                   cls:(on ? "equipped" : "") + (e.own ? "" : " locked"),
+                   note:t("meta." + d.stat) + " +" + Math.round(val * 100) + "%",
+                   acts:acts });
+    })(id);
+  }
+
+  function fmtN(n){ return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, "."); }
+
+  function renderAreas(){
     var host = $("arealist");
     if (!host) return;
     host.innerHTML = "";
@@ -3576,7 +3911,7 @@
         if (!areaUnlocked(i)) return;
         curArea = i;
         setTheme(a.theme);
-        renderAreas();
+        renderLobby();
       });
       host.appendChild(el);
     });
@@ -3651,9 +3986,15 @@
     panelPaused = false;
     started = false;
     newGame(); resize();
-    renderAreas();
+    renderLobby();
     $("ov-start").classList.add("on");
   }
+  $("lobbytabs").addEventListener("click", function(e){
+    var b = e.target && e.target.closest ? e.target.closest(".tab") : null;
+    if (!b) return;
+    lobbyTab = b.getAttribute("data-tab");
+    renderLobby();
+  });
   $("btn-retry").addEventListener("click", restart);
   $("btn-again").addEventListener("click", restart);
   $("btn-restart").addEventListener("click", function(){ restart(); $("panel").classList.remove("open"); });
@@ -3767,7 +4108,7 @@
 
   applyI18n();
   setTheme(area().theme);
-  renderAreas();
+  renderLobby();
   resize(); newGame(); buildTable(); refreshNotes();
   requestAnimationFrame(frame);
 
