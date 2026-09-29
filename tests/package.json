@@ -9,8 +9,9 @@
     "boss": "node boss.mjs",
     "arena": "node arena.mjs",
     "visual": "node visual.mjs",
+    "meta": "node meta.mjs",
     "themes": "node themes.mjs",
-    "all": "node check.js && node smoke.js && node perf.mjs && node boss.mjs && node arena.mjs && node visual.mjs && node themes.mjs"
+    "all": "node check.js && node smoke.js && node perf.mjs && node boss.mjs && node arena.mjs && node visual.mjs && node meta.mjs && node themes.mjs"
   },
   "devDependencies": {
     "playwright": "^1.63.0"

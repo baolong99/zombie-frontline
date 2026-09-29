@@ -38,8 +38,36 @@ Cố định **10 phút**, bản đồ vô tận không có biên.
 |---|---|
 | 2, 4, 6, 8, 10 phút | Một **elite**, hạ xong rơi hộp nâng cấp cao cấp (nâng cả một nhóm) |
 | Phút 5 | **Trùm phụ Thây Chúa** — quét sạch quái thường, đếm ngược 3·2·1, nhốt trong vòng vây đỏ |
-| Nhặt hộp của elite phút 10 | **Trùm chính Bạo Chúa** xuất hiện, vòng vây lần hai |
+| Hạ elite phút 10 | **Trùm chính Bạo Chúa** xuất hiện ngay, vòng vây lần hai, quái thường ngừng sinh |
 | Hạ Bạo Chúa | Thắng màn |
+
+## Tiến trình dài hạn
+
+Một ván kết thúc là hết — trừ hai thứ đi ra ngoài ván: **ví** và **khu vực đã qua**.
+
+Cả hai nằm trong hồ sơ `zf_profile` ở `localStorage`, và **mọi** thao tác với số dư đều đi
+qua đúng ba hàm `wallet.balance / grant / spend`. Đây là ràng buộc cố ý: kim cương sẽ bán
+bằng tiền thật, mà ví để ở máy người chơi thì sửa trong năm giây, nên ngày nối máy chủ chỉ
+ba hàm đó đổi ruột, không chỗ nào khác trong game phải sửa. Hồ sơ có sẵn số phiên bản và
+`migrateProfile()` từ ngày đầu, vì thêm đường nâng cấp lược đồ *sau* khi phát hành là đã muộn.
+
+| Khu vực | Mở khi | Máu quái | Vàng | Kim cương lần đầu |
+|---|---|---|---|---|
+| Nông trại | luôn mở | ×1,00 | ×1,00 | — |
+| Quốc lộ | qua Nông trại | ×1,45 | ×1,30 | 20 |
+| Thành phố | qua Quốc lộ | ×2,10 | ×1,70 | 30 |
+| Trại lính | qua Thành phố | ×3,10 | ×2,20 | 45 |
+| Tổ quái | qua Trại lính | ×4,50 | ×2,90 | 70 |
+
+Vàng nhặt trong ván chỉ là điểm số cho tới lúc `settle()` chạy; lúc đó nó được nhân hệ số
+khu vực rồi mới vào ví. Thua vẫn được nhận — thua sạch tay trắng thì người chơi bỏ game.
+
+Thang khu vực tồn tại để **tạo nhu cầu cho cửa hàng**: từ Quốc lộ trở đi, người chơi tay
+không sẽ không qua nổi, và đó là lúc súng với phụ kiện có lý do tồn tại. Chúng chưa có, nên
+hiện tại khu vực 2+ đang cố tình khó quá mức.
+
+Màn hình bắt đầu giờ là **sảnh**: ví ở trên, danh sách khu vực ở dưới, và "Chơi lại" sau khi
+thắng/thua quay về đây chứ không vào thẳng ván mới.
 
 ## Cây nâng cấp
 
@@ -223,6 +251,7 @@ npm run all
 | `boss.mjs` | Luồng cuối màn: trùm phụ → vòng vây → elite → hộp → trùm chính → thắng |
 | `arena.mjs` | Vòng vây kẹp đúng bán kính, mũi tên chỉ hộp |
 | `visual.mjs` | Chụp toàn trang: HUD, bảng Tune, menu nâng cấp, đổi ngôn ngữ giữa menu |
+| `meta.mjs` | Sảnh, ví, thang khu vực: khoá/mở, đọc ghi `localStorage`, hồ sơ hỏng và hồ sơ phiên bản cũ |
 | `themes.mjs` | Chụp ba khu vực ở cùng thời điểm để so sánh |
 | `survive.mjs` | **Tắt bất tử**, 3 lượt, đo bot sống được bao lâu. Nhận đường dẫn file khác làm tham số để so hai phiên bản |
 
@@ -244,11 +273,13 @@ script của game qua `vm`. Nhanh và hợp cho CI. Nhưng nó *không* thấy �
 
 ## Còn dang dở
 
-- Chưa có art thật — toàn bộ vẫn là hình vẽ bằng canvas primitive.
-- Ba khu vực mới khác nhau ở bảng màu và vật trang trí, chưa có ảnh lát nền.
-- Chưa có sảnh, chưa có hệ thể lực, chưa có cửa hàng súng / phụ kiện / nâng sao. Bảng cân
-  bằng hiện tại (`hpScale` ×1→×1,9 · trùm chính 3.800 · trùm phụ 1.600) được đặt cho người
-  chơi **tay không**; khi có hệ sao thì phải nâng lại toàn bộ.
-- Giãn cách quái tự tắt khi trên 110 con (xem chú thích trong `update`), nên ở mật độ cao
-  đám đông dính thành khối. Cần thay bằng lưới băm không gian.
+- Nhân vật, thây đi và thây chạy đã có sprite thật (Quaternius). Elite, trùm phụ và trùm
+  chính vẫn vẽ tay vì bộ art chưa có biến thể phân biệt được bằng màu.
+- Khu vực khác nhau ở bảng màu và vật trang trí, chưa có ảnh lát nền.
+- Chưa có cửa hàng súng / phụ kiện / nâng sao, chưa có rương, quảng cáo thưởng hay IAP.
+  Bảng cân bằng hiện tại (`hpScale` ×1→×1,9 · trùm chính 3.800 · trùm phụ 1.600) được đặt
+  cho người chơi **tay không** ở Nông trại; khi có hệ sao thì phải nâng lại toàn bộ.
+- Số đếm rương miễn phí mỗi ngày **bắt buộc** phải theo đồng hồ máy chủ. Đồng hồ máy người
+  chơi thì chỉnh lại là có rương, nên đừng làm tạm bằng `Date.now()`.
+- Trùm phụ và trùm chính chưa nghe thanh `T.zspeed` trong bảng Tune.
 - Số DPS trên HUD chưa cộng nòng phụ sau.

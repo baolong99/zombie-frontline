@@ -170,6 +170,22 @@
   .dbtn:hover{border-color:var(--toxic); color:var(--toxic)}
   .dbtn.wide{grid-column:1 / -1}
   .dbtn.on{border-color:var(--toxic); color:var(--toxic); background:rgba(142,230,74,.08)}
+  /* ví và bảng chọn khu vực trên màn hình mở đầu */
+  .purse{display:flex; gap:18px; align-items:center; justify-content:center; margin:14px 0 4px;
+    font:700 15px/1 var(--f-mono)}
+  .purse b{color:#eaf6ea}
+  .purse .coin{color:#ffcf49; font-size:17px; margin-right:5px}
+  .purse .gemi{color:#6fd6ff; font-size:17px; margin-right:5px}
+  .arealist{display:grid; grid-template-columns:repeat(auto-fit,minmax(88px,1fr)); gap:7px;
+    margin:12px 0 16px}
+  .areabtn{padding:9px 6px; border:1px solid var(--line2); border-radius:4px;
+    background:var(--panel2); color:var(--ink2); cursor:pointer; text-align:center;
+    font:600 10px/1.35 var(--f-mono); letter-spacing:.03em}
+  .areabtn i{display:block; font-style:normal; opacity:.6; font-size:9px; margin-top:3px}
+  .areabtn:hover:not(:disabled){border-color:var(--toxic); color:var(--toxic)}
+  .areabtn.on{border-color:var(--toxic); color:var(--toxic); background:rgba(142,230,74,.1)}
+  .areabtn:disabled{opacity:.4; cursor:not-allowed}
+  .areabtn.done i{color:var(--toxic); opacity:.9}
   /* Thông báo vòng vây phải nằm trên mọi lớp HUD: cột chip nâng cấp bên trái dài dần theo
      trận và tới cuối màn nó cắt ngang đúng chỗ này. Vẽ trên canvas thì luôn bị chip đè. */
   .arenamsg{position:absolute; left:0; right:0; top:26%; z-index:40; pointer-events:none;
@@ -316,6 +332,11 @@
           <div><b data-i18n="start.g3t"></b><span data-i18n="start.g3d"></span></div>
           <div><b data-i18n="start.g4t"></b><span data-i18n="start.g4d"></span></div>
         </div>
+        <div class="purse">
+          <span class="coin">◆</span><b id="w-gold">0</b>
+          <span class="gemi">◈</span><b id="w-gem">0</b>
+        </div>
+        <div class="arealist" id="arealist"></div>
         <button class="btn" id="btn-start" type="button" data-i18n="start.btn">Bắt đầu</button>
       </div>
     </div>
@@ -354,6 +375,7 @@
           <div><span data-i18n="stat.kills"></span><b id="v-kills">0</b></div>
           <div><span data-i18n="stat.level"></span><b id="v-lvl">1</b></div>
           <div><span data-i18n="stat.gold"></span><b id="v-gold">0</b></div>
+          <div id="v-gemrow" hidden><span data-i18n="stat.gem"></span><b id="v-gem">0</b></div>
         </div>
         <button class="btn" id="btn-again" type="button" data-i18n="win.btn">Chơi lại</button>
       </div>
@@ -564,6 +586,9 @@
       "panel.area":"Khu vực",
       "panel.areaNote":"Hiện mới đổi bảng màu và vật trang trí. Khi có art sẽ đổi cả ảnh lát nền và bộ da zombie theo khu vực.",
       "area.farm":"Nông trại", "area.war":"Chiến trường", "area.city":"Thành phố",
+      "area.road":"Quốc lộ", "area.camp":"Trại tị nạn", "area.nest":"Ổ dịch",
+      "area.locked":"chưa mở", "area.done":"đã sạch · {n} diệt", "area.hp":"máu quái ×{n}",
+      "stat.gem":"Kim cương",
       "panel.arena":"Bán kính vòng vây",
       "panel.arenaNote":"Trùm cuối xuất hiện là quái thường chết sạch và người chơi bị nhốt trong vòng bán kính này.",
       "boss.name":"Bạo Chúa",
@@ -695,6 +720,9 @@
       "panel.area":"Area",
       "panel.areaNote":"For now this only swaps the palette and the scenery props. Once art lands it will swap the ground tile and the zombie skins too.",
       "area.farm":"Farm", "area.war":"Battlefield", "area.city":"City",
+      "area.road":"Highway", "area.camp":"Refugee Camp", "area.nest":"The Nest",
+      "area.locked":"locked", "area.done":"cleared · {n} kills", "area.hp":"zombie HP ×{n}",
+      "stat.gem":"Gems",
       "panel.arena":"Arena radius",
       "panel.arenaNote":"When the final boss lands, every ordinary zombie dies at once and you are sealed inside a ring this wide.",
       "boss.name":"The Tyrant",
@@ -786,6 +814,7 @@
     try { localStorage.setItem("zf_lang", l); } catch(e){}
     applyI18n();
     refreshNotes();
+    renderAreas();
     if (G){
       renderUpStack();
       updateHUD();
@@ -798,6 +827,24 @@
     var el = e.target.closest ? e.target.closest(".langbtn") : null;
     if (el) setLang(el.getAttribute("data-lang"));
   });
+
+  // ================================================================ thang khu vực
+  // Không có thang này thì cửa hàng vô nghĩa: mua sao súng xong vẫn chơi đúng một màn cũ,
+  // không có lý do quay lại và không có chỗ tiêu tiền. Đây là phần tạo ra NHU CẦU.
+  //
+  // Hệ số máu tăng ~1,5 lần mỗi bậc. Hiện chưa có hệ vũ khí nên từ khu vực 2 trở đi sẽ rất
+  // khó — đó là chủ ý: khoảng trống đó chính là chỗ sao súng và phụ kiện sẽ lấp vào.
+  // Lần đầu dọn sạch một khu vực được thưởng kim cương, đây là nguồn kim cương không mất tiền.
+  var AREAS = [
+    { k:"farm", theme:"farm", hp:1.00, gold:1.00, firstGem:0 },
+    { k:"road", theme:"war",  hp:1.45, gold:1.30, firstGem:20 },
+    { k:"city", theme:"city", hp:2.10, gold:1.70, firstGem:30 },
+    { k:"camp", theme:"war",  hp:3.10, gold:2.20, firstGem:45 },
+    { k:"nest", theme:"city", hp:4.50, gold:2.90, firstGem:70 }
+  ];
+  var curArea = 0;
+  function area(){ return AREAS[curArea] || AREAS[0]; }
+  function areaUnlocked(i){ return i === 0 || !!P.cleared[AREAS[i - 1].k]; }
 
   // ================================================================ data
   var LEVEL_TIME = 600;                                // 10 phút
@@ -900,6 +947,56 @@
     if (saved) for (var sk in DEF) if (sk in saved) T[sk] = saved[sk];
   } catch(e){}
   function saveTune(){ try{ localStorage.setItem("zf_tune3", JSON.stringify(T)); }catch(e){} }
+
+  // ================================================================ hồ sơ người chơi
+  // MỌI thứ tồn tại qua nhiều ván đều đi qua đây, và chỉ qua đây. Hôm nay nó đọc ghi
+  // localStorage; ngày lên App Store thì ba hàm ví đổi thành gọi API máy chủ và không chỗ
+  // nào khác trong game phải sửa.
+  //
+  // Lý do làm ngay từ bây giờ dù chưa có server: kim cương sẽ mua được bằng tiền thật, mà
+  // ví nằm ở máy người chơi thì sửa trong năm giây. Nếu để rải rác "G.gold += 400" khắp
+  // nơi như trước thì tới lúc đó phải mò lại toàn bộ.
+  var PROFILE_KEY = "zf_profile";
+  var PROFILE_V = 1;
+  var P = { v:PROFILE_V, gold:0, gem:0, cleared:{}, best:{}, runs:0 };
+
+  function loadProfile(){
+    try {
+      var raw = JSON.parse(localStorage.getItem(PROFILE_KEY) || "null");
+      if (!raw) return;
+      // Chỗ nâng cấp lược đồ khi đổi phiên bản. Có sẵn từ đầu thì sau này không mất dữ liệu
+      // của người chơi, mà thêm vào sau khi đã phát hành thì đã muộn.
+      if (raw.v !== PROFILE_V) raw = migrateProfile(raw);
+      for (var k in P) if (k in raw) P[k] = raw[k];
+    } catch(e){}
+  }
+  function migrateProfile(raw){ raw.v = PROFILE_V; return raw; }
+  function saveProfile(){
+    try { localStorage.setItem(PROFILE_KEY, JSON.stringify(P)); } catch(e){}
+  }
+
+  // ---- ví. Chỉ ba hàm này được đụng vào số dư.
+  // `reason` hiện chưa dùng tới: nó có mặt để lúc nối máy chủ thì mọi nơi gọi đã sẵn nhãn
+  // cho sổ cái, khỏi phải sửa lại từng chỗ.
+  var wallet = {
+    balance: function(kind){ return P[kind] || 0; },
+    grant: function(kind, n, reason){
+      n = Math.max(0, Math.round(n));
+      if (!n) return 0;
+      P[kind] = (P[kind] || 0) + n;
+      saveProfile();
+      return n;
+    },
+    // trả về false nếu không đủ — nơi gọi PHẢI kiểm, đừng giả định là trừ được
+    spend: function(kind, n, reason){
+      n = Math.max(0, Math.round(n));
+      if ((P[kind] || 0) < n) return false;
+      P[kind] -= n;
+      saveProfile();
+      return true;
+    }
+  };
+  loadProfile();
 
   // ================================================================ setup
   var $ = function(id){ return document.getElementById(id); };
@@ -1155,8 +1252,8 @@
     else a = Math.random() * 6.283;
     return { x:p.x + Math.cos(a) * R, y:p.y + Math.sin(a) * R };
   }
-  // ×1 lúc mở màn lên ×1,9 ở phút 10 (trước là ×3,1) — hạ cùng nhịp với việc bỏ hệ 5 cấp
-  function hpScale(){ return 1 + (G.t / LEVEL_TIME) * 0.9; }
+  // ×1 lúc mở màn lên ×1,9 ở phút 10, rồi nhân thêm hệ số của khu vực đang chơi
+  function hpScale(){ return (1 + (G.t / LEVEL_TIME) * 0.9) * area().hp; }
 
   function spawnZombie(x, y, type){
     var d = ZTYPE[type];
@@ -1228,7 +1325,7 @@
     startArena();
     var pos = arenaSpawn();
     var m = { x:pos.x, y:pos.y, r:MINI.r, type:"mini", elite:null, kind:"mini",
-      hp:MINI.hp, maxhp:MINI.hp, speed:MINI.speed, dmg:MINI.dmg,
+      hp:MINI.hp * area().hp, maxhp:MINI.hp * area().hp, speed:MINI.speed, dmg:MINI.dmg,
       color:MINI.c, dark:MINI.dark, touch:0.6, xp:0,
       hit:0, cd:0, vx:0, vy:0, face:0, dead:false, wob:0, anim:"walk", ft:0,
       timer:4, ctimer:7, phase:"walk", shield:false, flanker:false };
@@ -1248,7 +1345,7 @@
     startArena();
     var pos = arenaSpawn();
     var b = { x:pos.x, y:pos.y, r:BOSS.r, type:"boss", elite:null, kind:"boss",
-      hp:BOSS.hp, maxhp:BOSS.hp, speed:BOSS.speed, dmg:BOSS.dmg,
+      hp:BOSS.hp * area().hp, maxhp:BOSS.hp * area().hp, speed:BOSS.speed, dmg:BOSS.dmg,
       color:BOSS.c, dark:BOSS.dark, touch:0.55, xp:0,
       hit:0, cd:0, vx:0, vy:0, face:0, dead:false, wob:0, anim:"walk", ft:0,
       timer:5, ctimer:9, phase:"walk", shield:false, flanker:false };
@@ -2336,12 +2433,30 @@
   }
 
   // ================================================================ flow
+  // Kết toán một ván: vàng nhặt trong màn nhân hệ số khu vực rồi chuyển vào ví thật.
+  // Trước đây G.gold chỉ hiện lên bảng tổng kết rồi bốc hơi cùng ván chơi.
+  function settle(won){
+    var a = area();
+    var earned = wallet.grant("gold", G.gold * a.gold, won ? "thắng_màn" : "thua_màn");
+    var gems = 0;
+    if (won && !P.cleared[a.k]){                 // lần đầu dọn sạch khu vực
+      P.cleared[a.k] = true;
+      gems = wallet.grant("gem", a.firstGem, "lần_đầu_dọn_" + a.k);
+    }
+    if (!P.best[a.k] || G.kills > P.best[a.k]) P.best[a.k] = G.kills;
+    P.runs++;
+    saveProfile();
+    renderAreas();
+    return { gold:earned, gem:gems };
+  }
+
   function die(){
     G.state = "dead";
+    var r = settle(false);
     $("d-time").textContent = fmtTime(G.t);
     $("d-kills").textContent = G.kills;
     $("d-lvl").textContent = G.lvl;
-    $("d-gold").textContent = G.gold;
+    $("d-gold").textContent = "+" + r.gold;
     $("ov-dead").classList.add("on");
     noise(0.5, 0.12);
   }
@@ -2349,10 +2464,13 @@
     G.state = "win";
     G.mini = null; G.boss = null; G.bossRef = null; G.arena = null;
     $("bosswrap").hidden = true;
+    var r = settle(true);
     $("v-time").textContent = fmtTime(G.t);
     $("v-kills").textContent = G.kills;
     $("v-lvl").textContent = G.lvl;
-    $("v-gold").textContent = G.gold;
+    $("v-gold").textContent = "+" + r.gold;
+    $("v-gemrow").hidden = !r.gem;
+    $("v-gem").textContent = "+" + r.gem;
     $("ov-win").classList.add("on");
     blip(660, 0.3, "triangle", 0.07);
     blip(880, 0.4, "triangle", 0.05);
@@ -3434,6 +3552,36 @@
   bindRange("s-xpc", "xpCurve", function(v){ return dec(v, 2) + "×"; }, refreshNotes);
   bindRange("s-arena", "arenaR", function(v){ return Math.round(v) + " px"; });
 
+  // ---- bảng chọn khu vực trên màn hình mở đầu
+  function renderAreas(){
+    $("w-gold").textContent = wallet.balance("gold");
+    $("w-gem").textContent = wallet.balance("gem");
+    var host = $("arealist");
+    if (!host) return;
+    host.innerHTML = "";
+    AREAS.forEach(function(a, i){
+      var open = areaUnlocked(i), done = !!P.cleared[a.k];
+      var el = document.createElement("button");
+      el.type = "button";
+      el.className = "areabtn" + (i === curArea ? " on" : "") + (done ? " done" : "");
+      el.disabled = !open;
+      var n = document.createElement("span");
+      n.textContent = t("area." + a.k);
+      var sub = document.createElement("i");
+      sub.textContent = !open ? t("area.locked")
+        : done ? t("area.done", { n:P.best[a.k] || 0 })
+        : t("area.hp", { n:dec(a.hp, 2) });
+      el.appendChild(n); el.appendChild(sub);
+      el.addEventListener("click", function(){
+        if (!areaUnlocked(i)) return;
+        curArea = i;
+        setTheme(a.theme);
+        renderAreas();
+      });
+      host.appendChild(el);
+    });
+  }
+
   // chọn khu vực: hôm nay chỉ đổi bảng màu và vật trang trí, sau này đổi cả ảnh nền và bộ da zombie
   function setTheme(k){
     if (!THEMES[k]) return;
@@ -3494,12 +3642,17 @@
     queuePick("crate");
   });
 
+  // Quay về SẢNH chứ không vào thẳng ván mới: đây là chỗ người chơi thấy ví, thấy khu vực
+  // vừa mở, và chọn đi tiếp hay cày lại. Sau này cửa hàng cũng nằm ở màn này.
   function restart(){
     ["ov-dead","ov-win","ov-pick","ov-pause"].forEach(function(id){ $(id).classList.remove("on"); });
     $("bosswrap").hidden = true;
     $("arenamsg").hidden = true;
     panelPaused = false;
+    started = false;
     newGame(); resize();
+    renderAreas();
+    $("ov-start").classList.add("on");
   }
   $("btn-retry").addEventListener("click", restart);
   $("btn-again").addEventListener("click", restart);
@@ -3584,6 +3737,9 @@
       axes:"toạ độ at[] là tương đối so với nhân vật: +x sang phải, +y xuống dưới; nhân vật luôn ở giữa màn hình",
       mode:G.state, started:started, t:Math.round(G.t), lvl:G.lvl, xp:[Math.round(G.xp), G.xpNext],
       kills:G.kills, gold:G.gold, lang:LANG,
+      // tiến trình dài hạn: khu vực đang chơi và ví đã tích luỹ qua các ván
+      meta:{ area:area().k, hp:area().hp, gold:P.gold, gem:P.gem,
+             cleared:Object.keys(P.cleared), runs:P.runs },
       player:{ world:[Math.round(p.x), Math.round(p.y)], hp:Math.round(p.hp), maxhp:Math.round(p.maxhp),
                aimDeg:Math.round(p.a * 180 / Math.PI), r:Math.round(p.r), shield:p.shieldUp },
       weapon:{ id:WEAPONS[p.wi].id, ammo:gun.ammo, mag:ws.mag, reloading:gun.reloadT > 0,
@@ -3610,6 +3766,8 @@
   };
 
   applyI18n();
+  setTheme(area().theme);
+  renderAreas();
   resize(); newGame(); buildTable(); refreshNotes();
   requestAnimationFrame(frame);
 

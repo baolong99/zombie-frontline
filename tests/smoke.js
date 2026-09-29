@@ -207,3 +207,7 @@ console.log("hud time=" + $("c-time").textContent + "  kills=" + $("c-kills").te
             "  lvl=" + $("c-lvl").textContent + "  gold=" + $("c-gold").textContent);
 console.log("dead overlay=" + $("ov-dead").classList.contains("on") +
             "  win overlay=" + $("ov-win").classList.contains("on"));
+// Tiến trình giữa các ván: ví và khu vực đã qua phải được ghi xuống sau khi ván kết thúc.
+console.log("profile=" + (store["zf_profile"] || "(chưa ghi)"));
+console.log("purse hud: gold=" + $("w-gold").textContent + " gem=" + $("w-gem").textContent +
+            "  area buttons=" + $("arealist").children.length);
