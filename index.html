@@ -2925,74 +2925,114 @@
     ctx.globalAlpha = 1;
   }
 
+  // ================================================================ chiếu 2.5D
+  // Mặt đất vẫn phẳng — mọi tính toán va chạm, vòng vây, tầm bắn đều giữ nguyên hệ toạ độ cũ.
+  // Chỉ có THÂN THỂ được dựng đứng lên từ điểm chạm đất, nhìn từ góc chếch khoảng 55°.
+  //
+  // Toạ độ cục bộ của một bộ phận: fx = ra phía trước (theo hướng ngắm), fy = sang phải,
+  // h = cao khỏi mặt đất. LEAN là độ nén của mặt đất khi nhìn chếch: bước một bước về phía
+  // xa thì trên màn hình chỉ dịch lên bằng nửa bước sang ngang.
+  var LEAN = 0.5;
+  var _pj = { x:0, y:0 };
+  function proj(x, y, a, fx, fy, h){
+    var c = Math.cos(a), s = Math.sin(a);
+    _pj.x = x + fx * c - fy * s;
+    _pj.y = y + (fx * s + fy * c) * LEAN - h;
+    return _pj;
+  }
+  // Nhìn nghiêng thì thân hẹp lại, nhìn thẳng mặt hoặc thẳng lưng thì thân nở ra.
+  function faceWidth(a){ return 0.70 + 0.30 * Math.abs(Math.sin(a)); }
+
   function drawZombie(z){
     var x = z.x, y = z.y, r = z.r;
     var big = !!z.elite || z.kind === "mini" || z.kind === "boss";
     // đường sprite: có ảnh thì vẽ ảnh rồi chỉ chồng thêm phần thông tin (thanh máu, khiên)
     if (drawSprite(z, z.kind || z.type, z.face)){ drawZombieBadges(z); return; }
-    // Thân zombie dựng theo bộ phận thay vì một hình tròn: bóng, hai tay chìa ra phía người
-    // chơi, thân khom, đầu cúi. Ở cỡ 26 px trên màn hình thì DÁNG mới là thứ đọc được, chi
-    // tiết thì không — nên tất cả ngân sách dồn vào bóng đổ và đường viền.
+    // Zombie dựng đứng theo phép chiếu 2.5D: chân, thân khom, hai tay chìa về phía người
+    // chơi, đầu cúi. Mọi bộ phận đặt bằng toạ độ (trước, phải, cao) rồi chiếu, nên thân tự
+    // xoay đủ 360° chứ không phải chọn một trong 8 hướng như sprite.
     // Không dùng gradient: 190 con mỗi khung là 190 lần tạo gradient, quá phí.
     var col = z.hit > 0 ? "#ffffff" : z.color;
-    var lurch = Math.sin(z.wob) * (z.type === "runner" ? 0.22 : 0.14);  // nhấp nhô lảo đảo
-    var by = y - r * 0.18 + Math.abs(Math.sin(z.wob)) * r * 0.10;
-    var ca = Math.cos(z.face), sa = Math.sin(z.face);
+    var a = z.face, H = r / 13;                          // H: hệ số cao, walker r=13 là 1
+    var gait = Math.sin(z.wob), sway = Math.cos(z.wob);
+    var lean = z.type === "runner" ? 0.30 : 0.16;        // runner chúi người về trước nhiều hơn
+    var bob = Math.abs(gait) * 1.6 * H;
+    var behind = Math.sin(a) < 0;                        // quay lưng về phía camera
+    var q;
 
     ctx.save();
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
     ctx.fillStyle = "rgba(0,0,0,.42)";
-    ctx.beginPath(); ctx.ellipse(x, y + r * 0.62, r * 1.02, r * 0.40, 0, 0, 6.283); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x, y, r * 0.95, r * 0.40, 0, 0, 6.283); ctx.fill();
 
-    // Hai tay chìa về phía trước, so le theo nhịp bước. Vẽ hai lượt: lượt đen dày làm viền,
-    // lượt màu thân bên trên — nếu để màu tối thì tay chìm nghỉm vào nền đất.
-    ctx.lineCap = "round";
-    for (var pass = 0; pass < 2; pass++){
-      ctx.strokeStyle = pass ? col : "rgba(0,0,0,.55)";
-      ctx.lineWidth = r * (pass ? 0.30 : 0.46);
-      ctx.beginPath();
-      for (var ah = -1; ah <= 1; ah += 2){
-        var sw = lurch * ah;
-        var px2 = x + Math.cos(z.face - 0.5 * ah) * r * 0.55;
-        var py2 = by + Math.sin(z.face - 0.5 * ah) * r * 0.55;
-        ctx.moveTo(px2, py2);
-        ctx.lineTo(px2 + Math.cos(z.face + sw) * r * 0.95, py2 + Math.sin(z.face + sw) * r * 0.95);
-      }
-      ctx.stroke();
+    // --- chân: hai ống, bước so le, đặt sang hai bên trục ngắm
+    ctx.strokeStyle = z.dark; ctx.lineWidth = 4.4 * H;
+    ctx.beginPath();
+    for (var lg = -1; lg <= 1; lg += 2){
+      q = proj(x, y, a, gait * 3.2 * H * lg, 3.4 * H * lg, 1);
+      var lx = q.x, ly = q.y;
+      q = proj(x, y, a, gait * 1.4 * H * lg, 3.4 * H * lg, 11 * H + bob);
+      ctx.moveTo(lx, ly); ctx.lineTo(q.x, q.y);
     }
+    ctx.stroke();
 
-    // thân: bầu dục hơi nghiêng theo nhịp lảo đảo
+    // --- tay: từ vai chìa thẳng về phía trước, so le theo nhịp
+    function zArms(){
+      for (var pass = 0; pass < 2; pass++){
+        ctx.strokeStyle = pass ? col : "rgba(0,0,0,.5)";
+        ctx.lineWidth = (pass ? 3.4 : 5.2) * H;
+        ctx.beginPath();
+        for (var ar = -1; ar <= 1; ar += 2){
+          q = proj(x, y, a, 1 * H, 6.2 * H * ar, 20 * H + bob);
+          var sx2 = q.x, sy2 = q.y;
+          q = proj(x, y, a, (12 + sway * 2 * ar) * H, 4.6 * H * ar, (16 + gait * 2 * ar) * H + bob);
+          ctx.moveTo(sx2, sy2); ctx.lineTo(q.x, q.y);
+        }
+        ctx.stroke();
+      }
+    }
+    if (behind) zArms();
+
+    // --- thân: bầu dục dựng đứng, hẹp khi nhìn nghiêng, nở khi nhìn thẳng mặt
+    q = proj(x, y, a, lean * 6 * H, 0, 16 * H + bob);
     ctx.save();
-    ctx.translate(x, by); ctx.rotate(lurch * 0.5);
+    ctx.translate(q.x, q.y); ctx.rotate(sway * 0.09);
     ctx.fillStyle = col;
-    ctx.beginPath(); ctx.ellipse(0, 0, r * 0.82, r * 0.96, 0, 0, 6.283); ctx.fill();
-    ctx.strokeStyle = big ? "rgba(0,0,0,.6)" : "rgba(0,0,0,.42)";
-    ctx.lineWidth = big ? 2.5 : 1.5; ctx.stroke();
-    // mảng sáng phía trên cho có khối, thay cho gradient
-    ctx.globalAlpha = 0.22; ctx.fillStyle = "#ffffff";
-    ctx.beginPath(); ctx.ellipse(-r * 0.2, -r * 0.34, r * 0.42, r * 0.3, 0, 0, 6.283); ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 7.6 * H * faceWidth(a), 9.5 * H, 0, 0, 6.283);
+    ctx.fill();
+    ctx.strokeStyle = big ? "rgba(0,0,0,.6)" : "rgba(0,0,0,.45)";
+    ctx.lineWidth = big ? 2.4 : 1.5; ctx.stroke();
+    ctx.globalAlpha = 0.24; ctx.fillStyle = "#ffffff";
+    ctx.beginPath(); ctx.ellipse(-2 * H, -3.4 * H, 4 * H, 3.2 * H, 0, 0, 6.283); ctx.fill();
     ctx.globalAlpha = 1;
     ctx.restore();
 
-    // đầu cúi về phía trước, cùng tông với thân nhưng tối hơn một bậc để tách khỏi vai
-    var hx2 = x + ca * r * 0.40, hy2 = by + sa * r * 0.40 - r * 0.12;
+    if (!behind) zArms();
+
+    // --- đầu cúi về trước
+    q = proj(x, y, a, (3 + lean * 8) * H, 0, 27 * H + bob);
+    var hx2 = q.x, hy2 = q.y;
     ctx.fillStyle = col;
-    ctx.beginPath(); ctx.arc(hx2, hy2, r * 0.42, 0, 6.283); ctx.fill();
-    ctx.strokeStyle = "rgba(0,0,0,.55)"; ctx.lineWidth = 1.4;
-    ctx.stroke();
-    ctx.fillStyle = z.dark;
-    ctx.beginPath(); ctx.arc(hx2, hy2, r * 0.42, z.face - 2.0, z.face + 2.0); ctx.fill();
-    // con mắt: điểm sáng duy nhất, cho biết nó đang nhìn đâu
-    ctx.fillStyle = z.type === "runner" ? "rgba(255,200,200,.98)" : "rgba(230,250,205,.85)";
-    ctx.beginPath();
-    ctx.arc(hx2 + ca * r * 0.2, hy2 + sa * r * 0.2, r * 0.15, 0, 6.283);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(hx2, hy2, 5.4 * H, 0, 6.283); ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,.5)"; ctx.lineWidth = 1.4; ctx.stroke();
+    ctx.fillStyle = z.dark;                                 // gáy tối, mặt sáng
+    ctx.beginPath(); ctx.arc(hx2, hy2, 5.4 * H, a + 1.3, a - 1.3); ctx.fill();
+    if (!behind){
+      ctx.fillStyle = z.type === "runner" ? "rgba(255,200,200,.98)" : "rgba(230,250,205,.85)";
+      q = proj(x, y, a, (6 + lean * 8) * H, 0, 27 * H + bob);
+      ctx.beginPath(); ctx.arc(q.x, q.y, 1.9 * H, 0, 6.283); ctx.fill();
+    }
 
     if (z.kind === "armor"){
+      // tấm giáp ôm trước ngực, dựng ở đúng độ cao thân
+      q = proj(x, y, a, 5 * H, 0, 16 * H + bob);
       ctx.strokeStyle = "#dfe8ee"; ctx.lineWidth = 6;
-      ctx.beginPath(); ctx.arc(x, by, r + 3, z.face - 1.2, z.face + 1.2); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(q.x, q.y, 10 * H, 12 * H, 0, a - 1.2, a + 1.2); ctx.stroke();
       ctx.strokeStyle = "rgba(60,72,80,.7)"; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.arc(x, by, r + 6, z.face - 1.2, z.face + 1.2); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(q.x, q.y, 12 * H, 14 * H, 0, a - 1.2, a + 1.2); ctx.stroke();
     }
+    var by = y - 16 * H;   // mốc giữa thân, cho khiên và các lớp phủ bên dưới
     if ((z.kind === "charger" || z.kind === "mini" || z.kind === "boss") && z.phase === "wind"){
       ctx.strokeStyle = "rgba(255,120,60,.9)"; ctx.lineWidth = 2; ctx.setLineDash([7, 7]);
       ctx.beginPath(); ctx.moveTo(x, y);
@@ -3025,43 +3065,87 @@
 
   function drawPlayer(p, wd){
     var x = p.x, y = p.y, S = p.r / 14;
-    var hurt = p.iframe > 0;
+    var a = p.a, hurt = p.iframe > 0;
     var step = p.anim === "walk" ? Math.sin(p.ft * 11) : Math.sin(p.ft * 2) * 0.25;
-    var by = y - 3 * S - Math.abs(step) * 1.2 * S;   // thân nhún theo bước chân
+    var bob = Math.abs(step) * 1.4 * S;
+    var behind = Math.sin(a) < 0;      // quay lưng lại camera thì súng và tay nằm sau thân
+    var q;
     ctx.save();
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
     ctx.fillStyle = "rgba(0,0,0,.5)";
-    ctx.beginPath(); ctx.ellipse(x, y + 10 * S, 16 * S, 6.6 * S, 0, 0, 6.283); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x, y, 13 * S, 5.4 * S, 0, 0, 6.283); ctx.fill();
 
-    // Thân người: sprite chỉ lật trái/phải, còn khẩu súng bên dưới vẫn xoay đủ 360°.
-    // Đó là lý do hai thứ này được vẽ tách rời ngay từ bản đầu tiên.
-    var body = drawSprite(p, "player", p.a);
+    // Nhân vật dựng theo phép chiếu 2.5D: chân bước, thân đứng, hai tay ôm súng, đầu đội mũ.
+    // Thân xoay liên tục 360° theo hướng ngắm chứ không chọn một trong 8 hướng như sprite —
+    // đây là thứ chỉ vẽ-bằng-code mới làm rẻ được.
+    var body = drawSprite(p, "player", a);
 
-    // hai chân bước so le, đặt vuông góc với hướng chạy để nhìn ra đang đi hướng nào
+    // --- chân: bước so le dọc theo HƯỚNG CHẠY, không phải hướng ngắm, nên chạy lùi mà vẫn
+    // ngắm về trước thì nhìn ra ngay là đang giật lùi
     if (!body){
-      var ma = p.moveA == null ? p.a : p.moveA;
-      var pxn = -Math.sin(ma), pyn = Math.cos(ma);
-      ctx.fillStyle = "#43584a";
-      for (var lg = -1; lg <= 1; lg += 2){
-        var off = step * lg * 5 * S;
-        ctx.beginPath();
-        ctx.ellipse(x + pxn * 5 * S * lg + Math.cos(ma) * off,
-                    y + 4 * S + pyn * 5 * S * lg + Math.sin(ma) * off,
-                    3.6 * S, 4.6 * S, ma, 0, 6.283);
-        ctx.fill();
-      }
-    }
-
-    ctx.save();
-    ctx.translate(x, by); ctx.rotate(p.a);
-    var len = (wd.id === "minigun" ? 30 : wd.id === "sniper" ? 36 : 24) * S;
-    // hai cánh tay ôm súng, vẽ trước nòng nên nòng nằm đè lên tay
-    if (!body){
-      ctx.strokeStyle = "#8fa894"; ctx.lineWidth = 4 * S; ctx.lineCap = "round";
+      var ma = p.moveA == null ? a : p.moveA;
+      var moving = p.anim === "walk";
+      ctx.strokeStyle = "#3d5044"; ctx.lineWidth = 5 * S;
       ctx.beginPath();
-      ctx.moveTo(1 * S, -6 * S); ctx.lineTo(len * 0.55, -3 * S);
-      ctx.moveTo(1 * S,  6 * S); ctx.lineTo(len * 0.45,  3 * S);
+      for (var lg = -1; lg <= 1; lg += 2){
+        var sw = moving ? step * lg : 0;
+        q = proj(x, y, ma, sw * 4 * S, 3.6 * S * lg, 1);
+        var lx = q.x, ly = q.y;
+        q = proj(x, y, ma, sw * 1.6 * S, 3.6 * S * lg, 12 * S + bob);
+        ctx.moveTo(lx, ly); ctx.lineTo(q.x, q.y);
+      }
       ctx.stroke();
     }
+
+    var len = (wd.id === "minigun" ? 30 : wd.id === "sniper" ? 36 : 24) * S;
+
+    // --- thân và đầu, vẽ trước súng nếu nhân vật đang quay lưng lại
+    function pBody(){
+      if (body) return;
+      q = proj(x, y, a, 0, 0, 20 * S + bob);
+      ctx.save();
+      ctx.translate(q.x, q.y);
+      ctx.fillStyle = hurt ? "#ffffff" : "#c3d8c8";
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 8.4 * S * faceWidth(a), 10 * S, 0, 0, 6.283);
+      ctx.fill();
+      ctx.strokeStyle = "#0e1512"; ctx.lineWidth = 2 * S; ctx.stroke();
+      ctx.globalAlpha = 0.45; ctx.fillStyle = "#ffffff";
+      ctx.beginPath(); ctx.ellipse(-2.4 * S, -3.6 * S, 4 * S, 3.4 * S, 0, 0, 6.283); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+    function pHead(){
+      if (body) return;
+      q = proj(x, y, a, 1.5 * S, 0, 31 * S + bob);
+      ctx.fillStyle = hurt ? "#ffffff" : "#e6f1e8";
+      ctx.beginPath(); ctx.arc(q.x, q.y, 6.2 * S, 0, 6.283); ctx.fill();
+      ctx.strokeStyle = "#0e1512"; ctx.lineWidth = 1.6 * S; ctx.stroke();
+      // mũ mang màu khẩu súng đang cầm, che nửa sau đầu
+      ctx.fillStyle = wd.color;
+      ctx.beginPath(); ctx.arc(q.x, q.y, 6.2 * S, a + 1.15, a - 1.15); ctx.fill();
+    }
+    // --- hai cánh tay ôm báng súng, đi từ vai tới tay cầm
+    function pArms(){
+      if (body) return;
+      ctx.strokeStyle = hurt ? "#ffffff" : "#9db3a3"; ctx.lineWidth = 4.2 * S;
+      ctx.beginPath();
+      for (var ar = -1; ar <= 1; ar += 2){
+        q = proj(x, y, a, 0, 6.6 * S * ar, 24 * S + bob);
+        var sx2 = q.x, sy2 = q.y;
+        q = proj(x, y, a, (ar < 0 ? 9 : 15) * S, 2.2 * S * ar, 20 * S + bob);
+        ctx.moveTo(sx2, sy2); ctx.lineTo(q.x, q.y);
+      }
+      ctx.stroke();
+    }
+
+    if (behind){ pArms(); }
+    else { pBody(); }
+
+    // --- khẩu súng, cầm ngang tầm ngực và xoay đủ 360°
+    q = proj(x, y, a, 0, 0, 20 * S + bob);
+    ctx.save();
+    ctx.translate(q.x, q.y); ctx.rotate(a);
     ctx.fillStyle = "#39463d"; ctx.fillRect(4 * S, -4.5 * S, len, 9 * S);
     ctx.fillStyle = wd.color; ctx.fillRect(len - 4 * S, -3 * S, 5 * S, 6 * S);
     if (wd.id === "minigun"){
@@ -3078,32 +3162,15 @@
     }
     ctx.restore();
 
-    if (!body){
-      // thân: bầu dục xoay theo hướng ngắm nên nhìn ra bờ vai, sáng nhất màn hình
-      ctx.save();
-      ctx.translate(x, by); ctx.rotate(p.a);
-      ctx.fillStyle = hurt ? "#ffffff" : "#c3d8c8";
-      ctx.beginPath(); ctx.ellipse(0, 0, p.r * 0.86, p.r * 1.0, 0, 0, 6.283); ctx.fill();
-      ctx.strokeStyle = "#0e1512"; ctx.lineWidth = 2 * S; ctx.stroke();
-      ctx.globalAlpha = 0.5; ctx.fillStyle = "#ffffff";
-      ctx.beginPath(); ctx.ellipse(-p.r * 0.2, -p.r * 0.28, p.r * 0.4, p.r * 0.34, 0, 0, 6.283); ctx.fill();
-      ctx.globalAlpha = 1;
-      ctx.restore();
+    if (behind){ pBody(); }
+    else { pArms(); }
+    pHead();
 
-      // đầu, lệch về phía ngắm, kèm dải màu của khẩu súng đang cầm làm mũ
-      var hx = x + Math.cos(p.a) * 3.4 * S, hy = by + Math.sin(p.a) * 3.4 * S;
-      ctx.fillStyle = hurt ? "#ffffff" : "#e6f1e8";
-      ctx.beginPath(); ctx.arc(hx, hy, p.r * 0.5, 0, 6.283); ctx.fill();
-      ctx.strokeStyle = "#0e1512"; ctx.lineWidth = 1.6 * S; ctx.stroke();
-      ctx.fillStyle = wd.color;
-      ctx.beginPath();
-      ctx.arc(hx, hy, p.r * 0.5, p.a - 1.5, p.a + 1.5);
-      ctx.closePath(); ctx.fill();
-    }
+    var by = y - 20 * S;   // mốc giữa thân, cho các vòng hiệu ứng bên dưới
     if (wd.steady && p.stillT >= STEADY_AFTER){
       ctx.strokeStyle = "rgba(207,232,255,.55)"; ctx.lineWidth = 1.4;
       ctx.setLineDash([3, 4]);
-      ctx.beginPath(); ctx.arc(x, y - 3 * S, p.r + 5, 0, 6.283); ctx.stroke();
+      ctx.beginPath(); ctx.arc(x, by, p.r + 5, 0, 6.283); ctx.stroke();
       ctx.setLineDash([]);
     }
     if (p.shieldUp){
