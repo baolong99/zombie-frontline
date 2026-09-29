@@ -1859,6 +1859,50 @@
     return false;
   }
 
+  // ---- Tách quái ra khỏi nhau bằng lưới băm không gian.
+  //
+  // Bản cũ là vòng lặp đôi O(n²) và bị tắt hẳn khi đàn quái vượt 110 con — với chú thích
+  // "chỉ là thẩm mỹ". Không phải: ở mật độ mặc định đàn quái luôn trên 110, nên việc tách
+  // KHÔNG BAO GIỜ chạy, và đo được cả 60 con trong mẫu chồng lên nhau thành một điểm.
+  //
+  // Lưới băm chỉ so mỗi con với những con trong cùng ô và 4 ô lân cận (theo một chiều để
+  // mỗi cặp chỉ xét đúng một lần), nên chi phí tuyến tính theo số quái và chạy được ở mọi
+  // mật độ. Khoá ô là một số nguyên chứ không phải chuỗi — tránh hàng nghìn lần nối chuỗi
+  // mỗi khung.
+  var SEP_CELL = 34, SEP_SPAN = 65536;
+  var _sepGrid = new Map();
+  var _sepNb = [SEP_SPAN, SEP_SPAN + 1, 1, -SEP_SPAN + 1];   // phải · phải-dưới · dưới · trái-dưới
+  function sepPair(za, zb){
+    var sx = zb.x - za.x, sy = zb.y - za.y, rr = za.r + zb.r;
+    if (Math.abs(sx) > rr || Math.abs(sy) > rr) return;
+    var sd = Math.hypot(sx, sy) || 0.01;
+    if (sd >= rr) return;
+    var push = (rr - sd) * 0.42, nx = sx / sd * push, ny = sy / sd * push;
+    za.x -= nx; za.y -= ny; zb.x += nx; zb.y += ny;
+  }
+  function separateZombies(){
+    var zs = G.zombies, g = _sepGrid;
+    g.clear();
+    for (var i = 0; i < zs.length; i++){
+      var z = zs[i];
+      if (z.dead || z.kind === "mini" || z.kind === "boss") continue;
+      var key = (Math.floor(z.x / SEP_CELL) + 32768) * SEP_SPAN + Math.floor(z.y / SEP_CELL) + 32768;
+      var b = g.get(key);
+      if (b) b.push(z); else g.set(key, [z]);
+    }
+    g.forEach(function(bucket, key){
+      for (var a = 0; a < bucket.length; a++){
+        var za = bucket[a];
+        for (var b2 = a + 1; b2 < bucket.length; b2++) sepPair(za, bucket[b2]);
+        for (var n = 0; n < 4; n++){
+          var nb = g.get(key + _sepNb[n]);
+          if (!nb) continue;
+          for (var c = 0; c < nb.length; c++) sepPair(za, nb[c]);
+        }
+      }
+    });
+  }
+
   function update(dt){
     var p = G.player;
     G.t += dt;
@@ -2085,6 +2129,16 @@
       // Quái thường bị vật cản chặn và trượt dọc theo nó. Elite và trùm thì húc thẳng qua —
       // để chúng kẹt sau một cuộn rơm thì trận đấu hỏng hẳn, mà cũng đúng chất của chúng.
       if (!z.elite && z.kind !== "mini" && z.kind !== "boss") pushOutOfProps(z, z.r);
+
+      // KHÔNG con nào được lún vào người chơi. Trước đây việc tách chỉ xảy ra lúc ra đòn,
+      // nên giữa hai đòn cả đàn chui thẳng vào giữa người chơi — đo được 150 con cùng một
+      // chỗ. Giờ tách vô điều kiện, mỗi khung, nên đám đông xếp thành vòng vây quanh người.
+      var pdx = z.x - p.x, pdy = z.y - p.y, pdd = Math.hypot(pdx, pdy), need = z.r + p.r;
+      if (pdd < need){
+        if (pdd < 0.01){ pdx = 1; pdy = 0; pdd = 1; }
+        z.x = p.x + pdx / pdd * need;
+        z.y = p.y + pdy / pdd * need;
+      }
       if (G.arena) clampToArena(z, z.r);
       // Bị bỏ xa quá thì dời ra rìa vòng sinh thay vì xoá: giữ nguyên áp lực đám đông
       // mà không để quái bị bỏ rơi chiếm chỗ trong giới hạn số quái sống.
@@ -2096,22 +2150,7 @@
       }
     }
 
-    // ---- separation (skip when the crowd gets huge, it is only cosmetic)
-    if (zs.length < 110){
-      for (var a1 = 0; a1 < zs.length; a1++){
-        var za = zs[a1]; if (za.dead || za.kind === "mini" || za.kind === "boss") continue;
-        for (var b1 = a1 + 1; b1 < zs.length; b1++){
-          var zb = zs[b1]; if (zb.dead || zb.kind === "mini" || zb.kind === "boss") continue;
-          var sx = zb.x - za.x, sy = zb.y - za.y, rr = za.r + zb.r;
-          if (Math.abs(sx) > rr || Math.abs(sy) > rr) continue;
-          var sd = Math.hypot(sx, sy) || 0.01;
-          if (sd < rr){
-            var push = (rr - sd) * 0.42, nx = sx / sd * push, ny = sy / sd * push;
-            za.x -= nx; za.y -= ny; zb.x += nx; zb.y += ny;
-          }
-        }
-      }
-    }
+    separateZombies();
 
     // ---- bullets
     for (var bi = G.bullets.length - 1; bi >= 0; bi--){
@@ -3440,6 +3479,28 @@
   // ================================================================ hook kiểm thử
   // Cửa sổ chỉ-đọc nhìn vào trạng thái trận đấu, đủ để chơi game mà không cần nhìn màn hình.
   // Kịch bản Playwright đọc cái này để đối chiếu với ảnh chụp. Không có tác dụng gì trong game.
+  function stackCount(){
+    var p = G.player, n = 0;
+    for (var i = 0; i < G.zombies.length; i++){
+      var z = G.zombies[i];
+      if (z.dead) continue;
+      if (Math.hypot(z.x - p.x, z.y - p.y) < z.r + p.r - 1) n++;
+    }
+    return n;
+  }
+  function overlapPairs(){
+    var zs = G.zombies, n = 0, lim = Math.min(zs.length, 60);
+    for (var i = 0; i < lim; i++){
+      if (zs[i].dead) continue;
+      for (var j = i + 1; j < lim; j++){
+        if (zs[j].dead) continue;
+        var rr = zs[i].r + zs[j].r;
+        if (Math.hypot(zs[i].x - zs[j].x, zs[i].y - zs[j].y) < rr * 0.8) n++;
+      }
+    }
+    return n;
+  }
+
   window.render_game_to_text = function(){
     if (!G) return JSON.stringify({ mode:"boot" });
     var p = G.player, ws = wstat(p.wi), gun = G.guns[p.wi];
@@ -3465,7 +3526,10 @@
                lines:ws.lines, dmg:Math.round(ws.dmg), range:Math.round(ws.range) },
       view:{ w:Math.round(vw), h:Math.round(vh) },
       target:G.target && !G.target.dead ? { at:rel(G.target), rear:G.rearLock } : null,
-      zombies:{ onScreen:vis.length, offScreen:off, list:vis.slice(0, 24) },
+      zombies:{ onScreen:vis.length, offScreen:off, list:vis.slice(0, 24),
+                // chẩn đoán chen lấn: bao nhiêu con đang lún vào người chơi, và bao nhiêu
+                // cặp quái đang chồng lên nhau (đếm trên 60 con đầu cho khỏi tốn)
+                stack:stackCount(), overlap:overlapPairs() },
       crates:G.crates.map(function(c){ return { at:rel(c), unique:!!c.unique, onScreen:onScreen(c) }; }),
       items:G.items.filter(function(it){ return it.kind !== "gold"; })
                    .map(function(it){ return { k:it.kind, at:rel(it), onScreen:onScreen(it) }; }),
