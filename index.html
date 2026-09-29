@@ -630,6 +630,7 @@
       "shop.buy":"Mua {n} ◆", "shop.buyGem":"Mua {n} ◈", "shop.star":"Nâng sao {n} ◆",
       "shop.max":"Tối đa", "shop.locked":"chưa sở hữu",
       "shop.equip":"Đeo", "shop.unequip":"Tháo", "shop.slots":"Ô trang bị {n}/{m}",
+      "shop.use":"Chọn", "shop.using":"Đang dùng",
       "meta.turn":"tốc xoay nòng", "meta.range":"tầm bắn", "meta.bspeed":"tốc độ đạn",
       "meta.mag":"băng đạn", "meta.pickup":"bán kính nhặt", "meta.gold":"vàng rơi",
       "meta.xp":"kinh nghiệm", "meta.none":"chưa có hệ số nào",
@@ -774,6 +775,7 @@
       "shop.buy":"Buy {n} ◆", "shop.buyGem":"Buy {n} ◈", "shop.star":"Star up {n} ◆",
       "shop.max":"Maxed", "shop.locked":"not owned",
       "shop.equip":"Equip", "shop.unequip":"Remove", "shop.slots":"Gear slots {n}/{m}",
+      "shop.use":"Select", "shop.using":"In use",
       "meta.turn":"turn rate", "meta.range":"range", "meta.bspeed":"bullet speed",
       "meta.mag":"magazine", "meta.pickup":"pickup radius", "meta.gold":"gold drops",
       "meta.xp":"xp gain", "meta.none":"no modifiers yet",
@@ -1057,7 +1059,7 @@
   var PROFILE_KEY = "zf_profile";
   var PROFILE_V = 2;
   var P = { v:PROFILE_V, gold:0, gem:0, cleared:{}, best:{}, runs:0,
-            guns:{}, acc:{}, equip:[] };
+            guns:{}, acc:{}, equip:[], gun:"smg" };
 
   function loadProfile(){
     try {
@@ -1167,6 +1169,7 @@
   loadProfile();
   // hồ sơ cũ có thể ghi tên món đã bị gỡ khỏi bảng, hoặc đeo quá số ô cho phép
   P.equip = P.equip.filter(function(id){ return ACC[id] && accEntry(id).own; }).slice(0, ACC_SLOTS);
+  if (!GUNS[P.gun] || !gunEntry(P.gun).own) P.gun = "smg";
 
   // ================================================================ setup
   var $ = function(id){ return document.getElementById(id); };
@@ -1233,7 +1236,13 @@
     for (var i = 0; i < WEAPONS.length; i++) if (gunEntry(WEAPONS[i].id).own) out.push(i);
     return out.length ? out : [0];
   }
-  function firstOwned(){ return ownedGuns()[0]; }
+  // Khẩu xuất phát là khẩu người chơi chọn ở sảnh. Mua Sniper mà vào ván vẫn cầm SMG thì
+  // cả cửa hàng vô nghĩa — đây chính là chỗ dễ quên nhất của cả hệ.
+  function firstOwned(){
+    for (var i = 0; i < WEAPONS.length; i++)
+      if (WEAPONS[i].id === P.gun && gunEntry(P.gun).own) return i;
+    return ownedGuns()[0];
+  }
 
   function uni(){ return G && G.unique ? UNIQUES[G.unique] : null; }
 
@@ -3829,15 +3838,21 @@
         acts.push({ label:t("shop.buy", { n:fmtN(d.cost) }), cls:"buy",
                     off:wallet.balance("gold") < d.cost,
                     run:function(){ return shop.buyGun(w.id); } });
-      } else if (e.star < MAX_STAR){
-        var c = starCost(d.starBase, e.star);
-        acts.push({ label:t("shop.star", { n:fmtN(c) }), cls:"buy",
-                    off:wallet.balance("gold") < c,
-                    run:function(){ return shop.starGun(w.id); } });
       } else {
-        acts.push({ label:t("shop.max"), off:true, run:function(){ return false; } });
+        var using = P.gun === w.id;
+        acts.push({ label:t(using ? "shop.using" : "shop.use"), off:using,
+                    run:function(){ P.gun = w.id; saveProfile(); return true; } });
+        if (e.star < MAX_STAR){
+          var c = starCost(d.starBase, e.star);
+          acts.push({ label:t("shop.star", { n:fmtN(c) }), cls:"buy",
+                      off:wallet.balance("gold") < c,
+                      run:function(){ return shop.starGun(w.id); } });
+        } else {
+          acts.push({ label:t("shop.max"), off:true, run:function(){ return false; } });
+        }
       }
-      srow(host, { name:w.name, star:e.star, cls:e.own ? "" : "locked",
+      srow(host, { name:w.name, star:e.star,
+                   cls:(e.own ? "" : "locked") + (P.gun === w.id ? " equipped" : ""),
                    note:e.own ? gunNote(w, m) : t("shop.locked"), acts:acts });
     });
   }

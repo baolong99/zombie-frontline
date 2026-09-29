@@ -84,23 +84,31 @@ const rows = (sel) => page.$$eval(sel + " .srow", els => els.map(e => ({
   note: e.querySelector(".s-note").textContent.trim(),
   acts: [...e.querySelectorAll(".s-btn")].map(b => ({ label:b.textContent.trim(), off:b.disabled }))
 })));
+// bấm nút có nhãn bắt đầu bằng `pre` ở dòng thứ `row`; trả về false nếu không có nút đó
+const press = (sel, row, pre) => page.$$eval(sel + " .srow",
+  (els, a) => {
+    const b = [...els[a.row].querySelectorAll(".s-btn")].find(x => x.textContent.trim().startsWith(a.pre));
+    if (!b || b.disabled) return false;
+    b.click(); return true;
+  }, { row, pre });
 const gold = () => page.$eval("#w-gold", e => +e.textContent);
 const gem  = () => page.$eval("#w-gem",  e => +e.textContent);
 
 await page.$eval('.tab[data-tab="guns"]', e => e.click());
 let g = await rows("#gunlist");
 ok(g.length === 5, "tab Súng liệt kê 5 khẩu");
-ok(g[0].acts[0].label.indexOf("Nâng sao") === 0, "SMG có sẵn nên chỉ nâng sao được");
+ok(g[0].acts.some(a => a.label === "Đang dùng"), "SMG là khẩu đang dùng");
+ok(g[0].acts.some(a => a.label.indexOf("Nâng sao") === 0), "SMG có sẵn nên nâng sao được");
 ok(g[4].acts[0].off, "Sniper 25.000 vượt quá 10.000 vàng nên nút bị khoá");
 
 // mua Rifle 2.500
-await page.$$eval("#gunlist .srow .s-btn", els => els[1].click());
+ok(await press("#gunlist", 1, "Mua"), "bấm được nút mua Rifle");
 ok(await gold() === 7500, "mua Rifle trừ đúng 2.500 (còn " + (await gold()) + ")");
 g = await rows("#gunlist");
-ok(g[1].acts[0].label.indexOf("Nâng sao") === 0, "mua xong Rifle chuyển sang nâng sao");
+ok(g[1].acts.some(a => a.label === "Chọn"), "mua xong Rifle thì chọn được làm khẩu xuất phát");
 
 // nâng sao Rifle: 800 cho sao đầu
-await page.$$eval("#gunlist .srow .s-btn", els => els[1].click());
+ok(await press("#gunlist", 1, "Nâng sao"), "bấm được nút nâng sao Rifle");
 ok(await gold() === 6700, "sao đầu của Rifle tốn 800 (còn " + (await gold()) + ")");
 ok((await rows("#gunlist"))[1].name.indexOf("★") > 0, "Rifle hiện một sao");
 
@@ -127,23 +135,31 @@ ok(equipped.length === 3, "chỉ đeo được 3 món (đang đeo " + equipped.l
 ok((await rows("#acclist")).some(r => r.acts[0].label === "Đeo" && r.acts[0].off),
    "món thứ tư có nút Đeo nhưng bị khoá");
 
+// --- khẩu xuất phát phải theo lựa chọn ở sảnh, không phải luôn luôn SMG
+await page.$eval('.tab[data-tab="guns"]', e => e.click());
+ok(await press("#gunlist", 1, "Chọn"), "chọn Rifle làm khẩu xuất phát");
+ok((await rows("#gunlist"))[1].acts[0].label === "Đang dùng", "Rifle hiện là khẩu đang dùng");
+await page.reload();
+await page.waitForTimeout(400);
+await page.$eval('.tab[data-tab="guns"]', e => e.click());
+ok((await rows("#gunlist"))[1].acts[0].label === "Đang dùng", "lựa chọn khẩu sống qua lần tải lại");
+
 // --- hệ số meta phải tới được trong ván
 await page.$eval("#btn-start", e => e.click());
 await page.waitForTimeout(500);
 s = await st();
-ok(s.weapon.id === "smg", "vào ván cầm khẩu đang sở hữu đầu tiên");
-const base = { range:340, mag:40 };
-ok(s.weapon.range > base.range || s.weapon.mag > base.mag,
-   "chỉ số meta có tác dụng: tầm " + s.weapon.range + " băng " + s.weapon.mag);
+ok(s.weapon.id === "rifle", "vào ván cầm đúng khẩu đã chọn (thấy " + s.weapon.id + ")");
+ok(s.weapon.range > 530,
+   "chỉ số meta có tác dụng: tầm Rifle " + s.weapon.range + " (gốc 530)");
 
 // --- khẩu chưa mua không được cầm, kể cả khi bấm thẳng phím số của nó
 await page.keyboard.press("Digit5");            // Sniper, chưa mua
 await page.waitForTimeout(80);
 s = await st();
-ok(s.weapon.id === "smg", "phím 5 không cầm được Sniper chưa mua (đang cầm " + s.weapon.id + ")");
-await page.keyboard.press("Digit2");            // Rifle, đã mua
+ok(s.weapon.id === "rifle", "phím 5 không cầm được Sniper chưa mua (đang cầm " + s.weapon.id + ")");
+await page.keyboard.press("Digit1");            // SMG, đã mua
 await page.waitForTimeout(80);
-ok((await st()).weapon.id === "rifle", "phím 2 cầm được Rifle đã mua");
+ok((await st()).weapon.id === "smg", "phím 1 cầm được SMG đã mua");
 const ids = new Set();
 for (let i = 0; i < 6; i++){ await page.keyboard.press("KeyQ"); await page.waitForTimeout(70);
                              ids.add((await st()).weapon.id); }
