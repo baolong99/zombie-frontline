@@ -161,12 +161,44 @@ def setup_scene(subject):
         o.rotation_euler = (math.atan2(math.hypot(dx, dy), -dz), 0.0, math.atan2(-dx, dy))
         sc.collection.objects.link(o)
 
+    print("  hộp bao: lo=%s hi=%s" % (tuple(round(v, 2) for v in lo), tuple(round(v, 2) for v in hi)))
+    print("  cao=%.2f rộng=%.2f khung=%.2f camera=%s" %
+          (height, width, span, tuple(round(v, 2) for v in cam.location)))
+
+    # --- Trục quay rời. KHÔNG xoay trực tiếp nhân vật: action nhập từ FBX thường chứa cả
+    # phép biến đổi của chính đối tượng, nên mỗi lần frame_set là góc xoay ta đặt bị ghi đè
+    # và cả 8 hàng ra giống hệt nhau. Bọc nhân vật vào một trục cha rồi xoay cái trục đó.
+    piv = bpy.data.objects.new("Turntable", None)
+    sc.collection.objects.link(piv)
+    subject.parent = piv
+    subject.matrix_parent_inverse = piv.matrix_world.inverted()
+
     # --- foot: điểm chạm đất nằm ở đâu trong ô, tính từ đỉnh ô
     # Khung ngắm vào target_z. Điểm z=0 nằm thấp hơn tâm khung một đoạn target_z*sin(nghiêng).
     foot = 0.5 + (target_z * math.sin(tilt)) / span
     # tỉ lệ chiều cao nhân vật so với chiều cao ô, để suy ra hMul
     frac = (height * math.sin(tilt)) / span
-    return cam, foot, frac
+    return piv, foot, frac
+
+
+# Blender 4.4 trở đi, gán action vào animation_data KHÔNG còn đủ: action chứa nhiều "slot"
+# và phải chỉ định slot thì dữ liệu mới thực sự tác dụng lên xương. Quên bước này thì nhân
+# vật đứng nguyên tư thế gốc ở mọi khung mà không báo lỗi gì cả.
+def bind_action(obj, act):
+    if obj.animation_data is None:
+        obj.animation_data_create()
+    ad = obj.animation_data
+    ad.action = act
+    if not hasattr(ad, "action_slot"):
+        return                                  # Blender cũ, không có slot
+    if ad.action_slot is not None:
+        return
+    slots = list(getattr(act, "slots", []) or [])
+    pick = next((s for s in slots if getattr(s, "target_id_type", "") == obj.id_type), None)
+    if pick is None and slots:
+        pick = slots[0]
+    if pick is not None:
+        ad.action_slot = pick
 
 
 def action_of(name):
@@ -177,25 +209,23 @@ def action_of(name):
     return a
 
 
-def render_sheet(subject, game_name, action_name, frames, out_path):
+def render_sheet(subject, pivot, game_name, action_name, frames, out_path):
     sc = bpy.context.scene
     act = action_of(action_name)
-    if subject.animation_data is None:
-        subject.animation_data_create()
-    subject.animation_data.action = act
+    bind_action(subject, act)
 
     f0, f1 = act.frame_range
     dirs = CFG["dirs"]
     cell = CFG["cell"]
     sheet = np.zeros((dirs * cell, frames * cell, 4), dtype=np.float32)
 
-    base_z = subject.rotation_euler.z
+    base_z = pivot.rotation_euler.z
     tmp = os.path.join(CFG["_out"], "_tmp.png")
 
     for row in range(dirs):
         # Hàng 0 quay mặt xuống dưới, các hàng sau theo chiều kim đồng hồ trên màn hình.
         # Trên màn hình chiều kim đồng hồ ứng với xoay ÂM quanh trục Z trong Blender.
-        subject.rotation_euler.z = base_z \
+        pivot.rotation_euler.z = base_z \
             - row * (2 * math.pi / dirs) + math.radians(CFG["facing_offset_deg"])
 
         for col in range(frames):
@@ -216,7 +246,7 @@ def render_sheet(subject, game_name, action_name, frames, out_path):
             y0 = (dirs - 1 - row) * cell
             sheet[y0:y0 + cell, col * cell:(col + 1) * cell] = buf.reshape(cell, cell, 4)
 
-    subject.rotation_euler.z = base_z
+    pivot.rotation_euler.z = base_z
     if os.path.exists(tmp):
         os.remove(tmp)
 
@@ -238,7 +268,7 @@ def main():
     subject = pick_subject()
     print("Đối tượng xoay: %s" % subject.name)
 
-    cam, foot, frac = setup_scene(subject)
+    pivot, foot, frac = setup_scene(subject)
     print("foot = %.3f · nhân vật cao %.0f%% chiều cao ô" % (foot, frac * 100))
 
     anims = {}
@@ -246,7 +276,7 @@ def main():
         key = "%s_%s" % (CFG["prefix"], game_name)
         path = os.path.join(out_dir, key + ".png")
         print("Render %s (action '%s', %d khung)..." % (game_name, action_name, frames))
-        render_sheet(subject, game_name, action_name, frames, path)
+        render_sheet(subject, pivot, game_name, action_name, frames, path)
         anims[game_name] = key
 
     # đoạn khai báo dán thẳng vào game

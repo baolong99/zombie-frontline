@@ -2407,9 +2407,24 @@
   // foot = điểm chạm đất nằm ở đâu tính từ đỉnh ô (0,90 = cách đáy 10%). Sai số này là thứ
   // làm nhân vật trôi lệch khỏi bóng của nó, nên nó là tham số riêng chứ không đoán.
   var ANIM_FPS = { idle:6, walk:12, die:14, attack:14 };
+
+  // Art từ bộ "Animated Characters Survivors" của Kenney (CC0), render sẵn 8 hướng bằng
+  // tools/render_sprites.py ở góc nghiêng 60° — khớp với LEAN của phép chiếu trong game.
+  // Bộ này chỉ có idle/jump/run, KHÔNG có hoạt cảnh chết, nên quái chết vẫn nổ thành hạt.
+  // fps riêng từng loại: walker lê bước chậm, runner chạy nhanh, dùng chung một hoạt cảnh.
   var SKIN = {
-    // player: { dirs:8, hMul:3.4, foot:0.90, anims:{ idle:"p_idle", walk:"p_walk" } },
+    player: { dirs:8, hMul:3.5, foot:0.882, fps:{ walk:12 },
+              anims:{ walk:"pl_walk", idle:"pl_idle" } },
+    walker: { dirs:8, hMul:3.3, foot:0.882, fps:{ walk:7 },
+              anims:{ walk:"zA_walk", idle:"zA_idle" } },
+    runner: { dirs:8, hMul:3.3, foot:0.882, fps:{ walk:14 },
+              anims:{ walk:"zC_walk", idle:"zC_idle" } }
   };
+  loadArt({
+    pl_walk:"assets/pl_walk.png", pl_idle:"assets/pl_idle.png",
+    zA_walk:"assets/zA_walk.png", zA_idle:"assets/zA_idle.png",
+    zC_walk:"assets/zC_walk.png", zC_idle:"assets/zC_idle.png"
+  });
 
   function skinImg(kind, anim){
     var sk = SKIN[kind];
@@ -2448,7 +2463,7 @@
     var dirs = sk.dirs || 1;
     var cell = im.height / dirs;
     var frames = Math.max(1, Math.round(im.width / cell));
-    var fps = ANIM_FPS[anim] || ANIM_FPS.walk;
+    var fps = (sk.fps && sk.fps[anim]) || ANIM_FPS[anim] || ANIM_FPS.walk;
     var fr = Math.floor((e.ft || 0) * fps);
     fr = anim === "die" ? Math.min(fr, frames - 1) : fr % frames;   // chết thì dừng ở khung cuối
     var h = e.r * (sk.hMul || 3), foot = sk.foot == null ? 0.9 : sk.foot;
@@ -3030,6 +3045,10 @@
   function drawZombie(z){
     var x = z.x, y = z.y, r = z.r;
     var big = !!z.elite || z.kind === "mini" || z.kind === "boss";
+    // Bóng đổ vẽ TRƯỚC khi rẽ nhánh sprite. Nếu để trong nhánh vẽ tay thì sprite không có
+    // bóng và nhân vật trôi lơ lửng — bóng mới là thứ ghim thực thể xuống mặt đất.
+    ctx.fillStyle = "rgba(0,0,0,.42)";
+    ctx.beginPath(); ctx.ellipse(x, y, r * 0.95, r * 0.40, 0, 0, 6.283); ctx.fill();
     // đường sprite: có ảnh thì vẽ ảnh rồi chỉ chồng thêm phần thông tin (thanh máu, khiên)
     if (drawSprite(z, z.kind || z.type, z.face)){ drawZombieBadges(z); return; }
     // Zombie dựng đứng theo phép chiếu 2.5D: chân, thân khom, hai tay chìa về phía người
@@ -3046,8 +3065,6 @@
 
     ctx.save();
     ctx.lineCap = "round"; ctx.lineJoin = "round";
-    ctx.fillStyle = "rgba(0,0,0,.42)";
-    ctx.beginPath(); ctx.ellipse(x, y, r * 0.95, r * 0.40, 0, 0, 6.283); ctx.fill();
 
     // --- chân: hai ống, bước so le, đặt sang hai bên trục ngắm
     ctx.strokeStyle = z.dark; ctx.lineWidth = 4.4 * H;

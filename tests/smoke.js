@@ -93,6 +93,9 @@ const sandbox = {
     setItem: (k, v) => { store[k] = String(v); },
     removeItem: k => { delete store[k]; }
   },
+  // Ảnh không bao giờ tải xong trong DOM giả — cố ý. Bài kiểm này đo LOGIC, và không tải
+  // được thì drawSprite luôn trả về false nên game chạy nhánh vẽ tay, đúng thứ cần đo.
+  Image: function(){ return { onload: null, onerror: null, src: "", width: 0, height: 0 }; },
   performance: { now: () => 0 },
   requestAnimationFrame: cb => { rafQueue.push(cb); return rafQueue.length; },
   cancelAnimationFrame: () => {},
@@ -165,9 +168,16 @@ for (; i < MAX_ITER; i++){
   if (FRAMES === 1) steer(3);
   else if (FRAMES >= 2000 && FRAMES % 37 === 0) steer(Math.floor(FRAMES / 37));
   if (FRAMES % 20000 === 1) console.log("  " + JSON.stringify(sandbox.__probe()));
-  // phát hiện treo: đồng hồ trong game không nhúc nhích suốt 3000 vòng
-  if (FRAMES % 3000 === 0){
+  // Phát hiện treo: đồng hồ trong game không nhúc nhích suốt 20000 vòng. Cửa sổ phải rộng
+  // vì menu nâng cấp có khoá chống bấm đúp tính bằng thời gian THẬT — lúc menu mở, vòng lặp
+  // quay hàng nghìn lần mà đồng hồ game đứng yên, và đó là bình thường.
+  if (FRAMES % 20000 === 0){
     var now = sandbox.__probe();
+    // thắng hoặc chết thì đồng hồ dừng là đúng, không phải treo
+    if (now.state === "win" || now.state === "dead"){
+      console.log("kết thúc: " + now.state + " ở t=" + now.t + "s");
+      break;
+    }
     if (lastT !== null && now.t === lastT){
       console.log("STALL tại t=" + now.t + "s -> " + JSON.stringify(now));
       console.log("  overlay pick on = " + $("ov-pick").classList.contains("on") +
