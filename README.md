@@ -192,6 +192,20 @@ Bốn chỗ script lo hộ, cũng là bốn chỗ làm tay hay sai:
 Nếu render ra mà hàng 0 không phải hướng quay mặt xuống dưới thì mô hình có tư thế gốc
 khác — chỉnh `facing_offset_deg` (thử 180, rồi 90, rồi −90).
 
+**Ràng buộc quan trọng nhất:** góc nghiêng lúc render và hằng số `LEAN` trong `index.html`
+phải khớp nhau theo `LEAN = cos(tilt_deg)`. Mặc định 60° ↔ 0,50. Đổi một bên mà quên bên
+kia thì bóng đổ và vật cản lệch phối cảnh so với nhân vật — nhìn sai mà khó chỉ ra sai ở đâu.
+
+Kiểm đường ống mà chưa có mô hình thật:
+
+```bash
+blender --background --python tools/make_test_scene.py      # dựng nhân vật thử có mũi chĩa về nam
+SPRITE_CFG=cfg.json blender test_scene.blend --background --python tools/render_sprites.py
+```
+
+Nhân vật thử là hình trụ có một cái mũi nhọn. Nhìn sprite sheet ra là kiểm được thứ tự
+hướng ngay: hàng 0 mũi chĩa xuống, hàng 2 chĩa trái, hàng 4 khuất sau lưng, hàng 6 chĩa phải.
+
 ## Kiểm thử
 
 ```bash

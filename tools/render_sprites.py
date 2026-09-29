@@ -24,7 +24,12 @@ CFG = {
 
     "dirs": 8,                     # số hàng = số hướng quay
     "cell": 128,                   # cạnh mỗi ô, pixel. Ô BẮT BUỘC vuông
-    "tilt_deg": 60.0,              # nghiêng so với phương đứng; 60 khớp LEAN 0.5 trong game
+    # Nghiêng so với phương thẳng đứng. RÀNG BUỘC: phải khớp với LEAN trong index.html theo
+    #     LEAN = cos(tilt_deg)
+    # 60° -> LEAN 0.50 (mặc định hiện tại) · 50° -> 0.64 (nhìn từ trên xuống nhiều hơn)
+    # 45° -> 0.71 · 70° -> 0.34 (gần như nhìn ngang). Đổi ở đây thì phải đổi cả trong game,
+    # nếu không bóng đổ và vật cản sẽ lệch phối cảnh so với nhân vật.
+    "tilt_deg": 60.0,
     "margin": 1.18,                # nới khung quanh nhân vật, 1.0 là sát khít
 
     # Hoạt cảnh: tên trong game -> (tên action trong Blender, số khung lấy mẫu).
@@ -39,6 +44,21 @@ CFG = {
     # xuống dưới thì chỉnh số này: thử 180, rồi 90, rồi -90.
     "facing_offset_deg": 0.0,
 }
+
+# Có thể đè cấu hình từ ngoài mà không phải sửa file, tiện khi render nhiều nhân vật:
+#   set SPRITE_CFG=C:\duong\dan\cau-hinh.json   (Windows)
+#   SPRITE_CFG=cau-hinh.json blender ...        (macOS/Linux)
+_ext = os.environ.get("SPRITE_CFG")
+if _ext and os.path.exists(_ext):
+    # utf-8-sig chứ không phải utf-8: PowerShell trên Windows ghi JSON kèm BOM, và
+    # json.load sẽ chết ngay ở ký tự đầu tiên nếu đọc bằng utf-8 thuần.
+    with open(_ext, encoding="utf-8-sig") as _f:
+        _over = json.load(_f)
+    # anims trong JSON là {"walk": ["Walk", 8]}; đổi về tuple cho khớp
+    if "anims" in _over:
+        _over["anims"] = {k: tuple(v) for k, v in _over["anims"].items()}
+    CFG.update(_over)
+    print("Đã nạp cấu hình ngoài: %s" % _ext)
 # ============================================================
 
 
@@ -121,19 +141,24 @@ def setup_scene(subject):
 
     # --- đèn đặt cố định trong thế giới. Camera đứng yên và chỉ mô hình xoay, nên đèn cố
     # định trong thế giới CHÍNH LÀ đèn cố định so với camera: cả 8 hướng sáng như nhau.
-    for name, loc, energy, size in [
-        ("Key",  (-4,  -6,  8), 5.0, 6.0),
-        ("Fill", ( 5,  -4,  3), 1.6, 8.0),
-        ("Rim",  ( 0,   6,  5), 2.4, 5.0),
+    #
+    # Dùng đèn MẶT TRỜI chứ không phải đèn vùng: cường độ mặt trời không phụ thuộc khoảng
+    # cách, nên không phải dò lại công suất mỗi khi mô hình to nhỏ khác nhau. Bản đầu dùng
+    # đèn vùng và render ra đen thui vì công suất quá nhỏ so với khoảng cách.
+    for name, direction, energy in [
+        ("Key",  (-0.4, -0.7, -1.0), 4.0),     # chính, từ trên chếch trái trước
+        ("Fill", ( 0.8, -0.4, -0.5), 1.2),     # phụ, làm mềm bóng bên phải
+        ("Rim",  ( 0.0,  0.9, -0.4), 2.5),     # viền sau, tách nhân vật khỏi nền
     ]:
-        d = bpy.data.lights.new(name, type="AREA")
-        d.energy = energy * max(1.0, height) ** 2
-        d.size = size
+        d = bpy.data.lights.new(name, type="SUN")
+        d.energy = energy
+        d.angle = math.radians(12)             # mép bóng mềm một chút
         o = bpy.data.objects.new(name, d)
-        o.location = loc
-        # chĩa về giữa nhân vật
-        dx, dy, dz = -loc[0], -loc[1], target_z - loc[2]
-        o.rotation_euler = (math.atan2(math.hypot(dx, dy), -dz), 0.0, math.atan2(dy, dx) + math.pi / 2)
+        o.location = (0, 0, height * 3)
+        # Đèn ở tư thế gốc chiếu theo -Z. Xoay X một góc thì -Z nghiêng về phía +Y, nên
+        # phải xoay Z sao cho +Y cục bộ trùng với hình chiếu ngang của hướng chiếu.
+        dx, dy, dz = direction
+        o.rotation_euler = (math.atan2(math.hypot(dx, dy), -dz), 0.0, math.atan2(-dx, dy))
         sc.collection.objects.link(o)
 
     # --- foot: điểm chạm đất nằm ở đâu trong ô, tính từ đỉnh ô
