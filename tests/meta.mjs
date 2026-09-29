@@ -229,6 +229,24 @@ ok(await page.$eval("#w-gold", e => +e.textContent) === 20000,
 await page.reload();
 await page.waitForTimeout(400);
 ok(await page.$eval("#w-gold", e => +e.textContent) === 20000, "vàng nút thử sống qua tải lại");
+// Nhãn phải mang số dư: trong ván thì thanh ví bị ẩn, không có nó thì bấm xong
+// không thấy gì đổi và nút trông y như hỏng.
+ok((await page.$eval("#d-gold", e => e.textContent)).indexOf("20.000") > 0,
+   "nhãn nút hiện số dư ví: " + await page.$eval("#d-gold", e => e.textContent));
+
+// --- tạm dừng giữa ván phải ra được sảnh để tiêu số vàng đó
+await page.$eval("#btn-start", e => e.click());
+await page.waitForTimeout(400);
+await page.keyboard.press("KeyP");
+await page.waitForTimeout(250);
+ok(await page.$eval("#ov-pause", e => e.classList.contains("on")), "bấm P thì tạm dừng");
+await page.$eval("#btn-lobby", e => e.click());
+await page.waitForTimeout(400);
+ok(await page.$eval("#ov-start", e => e.classList.contains("on")), "về sảnh được giữa ván");
+await page.$eval('.tab[data-tab="guns"]', e => e.click());
+const beforeBuy = await page.$eval("#w-gold", e => +e.textContent);
+ok(await press("#gunlist", 2, "Mua"), "mua được súng bằng vàng của nút thử");
+ok(await page.$eval("#w-gold", e => +e.textContent) < beforeBuy, "ví trừ tiền sau khi mua");
 
 ok(errors.length === 0, "không có lỗi trang: " + (errors[0] || ""));
 await browser.close();

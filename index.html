@@ -118,6 +118,8 @@
     padding:14px 30px; border-radius:3px; border:1px solid var(--toxic); background:rgba(142,230,74,.12);
     color:var(--toxic); cursor:pointer}
   .btn:hover{background:rgba(142,230,74,.22)}
+  .btn.ghost{border-color:var(--line2); background:transparent; color:var(--ink2); margin-top:9px}
+  .btn.ghost:hover{border-color:var(--toxic); color:var(--toxic); background:transparent}
   .btn:focus-visible,.tbtn:focus-visible,.picks button:focus-visible,.pbtn:focus-visible,.paneltoggle:focus-visible{
     outline:2px solid var(--cyan); outline-offset:2px}
   .keyguide{margin:22px auto 0; display:grid; grid-template-columns:repeat(auto-fit,minmax(168px,1fr));
@@ -428,6 +430,7 @@
         <h2 data-i18n="pause.title">Đang nghỉ giữa hiệp</h2>
         <p data-i18n="pause.body"></p>
         <button class="btn" id="btn-resume" type="button" data-i18n="pause.btn">Tiếp tục</button>
+        <button class="btn ghost" id="btn-lobby" type="button" data-i18n="pause.lobby">Về sảnh</button>
       </div>
     </div>
   </div>
@@ -458,7 +461,7 @@
         <button class="dbtn" id="d-uniq" type="button" data-i18n="btn.uniq"></button>
         <button class="dbtn wide" id="d-cratefar" type="button" data-i18n="btn.cratefar"></button>
         <button class="dbtn wide" id="d-mainboss" type="button" data-i18n="btn.mainboss"></button>
-        <button class="dbtn wide" id="d-gold" type="button" data-i18n="btn.gold"></button>
+        <button class="dbtn wide" id="d-gold" type="button"></button>
       </div>
     </div>
 
@@ -604,6 +607,7 @@
       "win.btn":"Chơi lại",
       "pause.kicker":"Tạm dừng", "pause.title":"Đang nghỉ giữa hiệp",
       "pause.body":"Chỉnh thông số trong bảng Tune rồi quay lại — thay đổi có hiệu lực ngay lập tức.",
+      "pause.lobby":"Về sảnh (bỏ ván này)",
       "pause.btn":"Tiếp tục",
       "stat.survived":"Trụ được", "stat.kills":"Diệt", "stat.level":"Cấp",
       "stat.gold":"Vàng", "stat.time":"Thời gian",
@@ -615,7 +619,7 @@
       "btn.elite":"Triệu hồi Elite", "btn.mini":"Gọi Trùm phụ", "btn.lvl3":"Lên 3 cấp",
       "btn.heal":"Hồi đầy máu", "btn.crate":"Hộp cao cấp", "btn.uniq":"Nâng cấp độc nhất",
       "btn.cratefar":"Thả hộp ở xa 300px", "btn.mainboss":"Gọi Trùm chính",
-      "btn.gold":"+10.000 vàng vào ví",
+      "btn.gold":"+10.000 vàng · ví đang có {n}",
       "panel.aim":"Cơ chế ngắm", "panel.turnMul":"Hệ số tốc độ xoay",
       "panel.turnNote":"Quay 180°: Minigun {a} s · SMG {b} s",
       "panel.arc":"Góc quét trước mặt",
@@ -755,6 +759,7 @@
       "win.btn":"Play again",
       "pause.kicker":"Paused", "pause.title":"Taking a breather",
       "pause.body":"Change anything in the Tune panel and come back — every change applies immediately.",
+      "pause.lobby":"Back to lobby (abandon run)",
       "pause.btn":"Resume",
       "stat.survived":"Survived", "stat.kills":"Kills", "stat.level":"Level",
       "stat.gold":"Gold", "stat.time":"Time",
@@ -766,7 +771,7 @@
       "btn.elite":"Summon Elite", "btn.mini":"Summon Mini-boss", "btn.lvl3":"Gain 3 levels",
       "btn.heal":"Full heal", "btn.crate":"Advanced crate", "btn.uniq":"Unique upgrade",
       "btn.cratefar":"Drop a crate 300px away", "btn.mainboss":"Summon the Tyrant",
-      "btn.gold":"+10,000 gold to wallet",
+      "btn.gold":"+10,000 gold · wallet has {n}",
       "panel.aim":"Aiming", "panel.turnMul":"Turn rate multiplier",
       "panel.turnNote":"180° turn: Minigun {a} s · SMG {b} s",
       "panel.arc":"Front scan arc",
@@ -891,6 +896,7 @@
     applyI18n();
     refreshNotes();
     renderLobby();
+    syncGoldBtn();
     if (G){
       renderUpStack();
       updateHUD();
@@ -4124,9 +4130,16 @@
   $("d-heal").addEventListener("click", function(){ if (G) G.player.hp = G.player.maxhp; });
   // Nạp thẳng vào VÍ, không vào G.gold: vàng nhặt trong ván chỉ là điểm số cho tới lúc
   // settle() chạy cuối màn, nên cộng vào đó thì mở cửa hàng ra vẫn không mua được gì.
+  // Nhãn mang luôn số dư ví. Cần thế vì trong ván thì thanh ví nằm trên màn sảnh đang bị
+  // ẩn, còn số vàng trên HUD là điểm số của ván chứ không phải ví — bấm xong không có gì
+  // trên màn hình đổi, và trông y như nút hỏng.
+  function syncGoldBtn(){
+    $("d-gold").textContent = t("btn.gold", { n:fmtN(wallet.balance("gold")) });
+  }
   $("d-gold").addEventListener("click", function(){
     wallet.grant("gold", 10000, "nút_thử");
     renderLobby();
+    syncGoldBtn();
     blip(880, 0.06, "square", 0.035);
   });
   $("d-mainboss").addEventListener("click", function(){
@@ -4162,6 +4175,9 @@
     lobbyTab = b.getAttribute("data-tab");
     renderLobby();
   });
+  // Bỏ ván đang chơi để ra sảnh mua đồ. Trước đây chỉ có chết hoặc thắng mới tới được cửa
+  // hàng, nên nạp vàng bằng nút thử xong vẫn không tiêu được gì cho tới hết màn.
+  $("btn-lobby").addEventListener("click", restart);
   $("btn-retry").addEventListener("click", restart);
   $("btn-again").addEventListener("click", restart);
   $("btn-restart").addEventListener("click", function(){ restart(); $("panel").classList.remove("open"); });
@@ -4282,6 +4298,7 @@
   applyI18n();
   setTheme(area().theme);
   renderLobby();
+  syncGoldBtn();
   resize(); newGame(); buildTable(); refreshNotes();
   requestAnimationFrame(frame);
 
