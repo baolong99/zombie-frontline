@@ -2408,22 +2408,24 @@
   // làm nhân vật trôi lệch khỏi bóng của nó, nên nó là tham số riêng chứ không đoán.
   var ANIM_FPS = { idle:6, walk:12, die:14, attack:14 };
 
-  // Art từ bộ "Animated Characters Survivors" của Kenney (CC0), render sẵn 8 hướng bằng
+  // Art từ "Ultimate Animated Character Pack" của Quaternius (CC0), render sẵn 8 hướng bằng
   // tools/render_sprites.py ở góc nghiêng 60° — khớp với LEAN của phép chiếu trong game.
-  // Bộ này chỉ có idle/jump/run, KHÔNG có hoạt cảnh chết, nên quái chết vẫn nổ thành hạt.
-  // fps riêng từng loại: walker lê bước chậm, runner chạy nhanh, dùng chung một hoạt cảnh.
+  //
+  // Bộ này CÓ hoạt cảnh chết, nên hệ thống xác chết dựng từ Version 15 giờ mới thật sự chạy:
+  // zombie ngã xuống và nằm lại cho tới hết hoạt cảnh, thay vì nổ thành hạt.
+  // Walker dùng hoạt cảnh Walk (lê bước), runner dùng Run — hai dáng đi khác hẳn nhau.
   var SKIN = {
-    player: { dirs:8, hMul:3.5, foot:0.882, fps:{ walk:12 },
+    player: { dirs:8, hMul:3.0, foot:0.919, fps:{ walk:14 },
               anims:{ walk:"pl_walk", idle:"pl_idle" } },
-    walker: { dirs:8, hMul:3.3, foot:0.882, fps:{ walk:7 },
-              anims:{ walk:"zA_walk", idle:"zA_idle" } },
-    runner: { dirs:8, hMul:3.3, foot:0.882, fps:{ walk:14 },
-              anims:{ walk:"zC_walk", idle:"zC_idle" } }
+    walker: { dirs:8, hMul:3.0, foot:0.918, fps:{ walk:9 },
+              anims:{ walk:"zm_walk", die:"zm_die" } },
+    runner: { dirs:8, hMul:2.9, foot:0.919, fps:{ walk:15 },
+              anims:{ walk:"zf_walk", die:"zf_die" } }
   };
   loadArt({
     pl_walk:"assets/pl_walk.png", pl_idle:"assets/pl_idle.png",
-    zA_walk:"assets/zA_walk.png", zA_idle:"assets/zA_idle.png",
-    zC_walk:"assets/zC_walk.png", zC_idle:"assets/zC_idle.png"
+    zm_walk:"assets/zm_walk.png", zm_die:"assets/zm_die.png",
+    zf_walk:"assets/zf_walk.png", zf_die:"assets/zf_die.png"
   });
 
   function skinImg(kind, anim){
