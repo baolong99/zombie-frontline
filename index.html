@@ -458,6 +458,7 @@
         <button class="dbtn" id="d-uniq" type="button" data-i18n="btn.uniq"></button>
         <button class="dbtn wide" id="d-cratefar" type="button" data-i18n="btn.cratefar"></button>
         <button class="dbtn wide" id="d-mainboss" type="button" data-i18n="btn.mainboss"></button>
+        <button class="dbtn wide" id="d-gold" type="button" data-i18n="btn.gold"></button>
       </div>
     </div>
 
@@ -614,6 +615,7 @@
       "btn.elite":"Triệu hồi Elite", "btn.mini":"Gọi Trùm phụ", "btn.lvl3":"Lên 3 cấp",
       "btn.heal":"Hồi đầy máu", "btn.crate":"Hộp cao cấp", "btn.uniq":"Nâng cấp độc nhất",
       "btn.cratefar":"Thả hộp ở xa 300px", "btn.mainboss":"Gọi Trùm chính",
+      "btn.gold":"+10.000 vàng vào ví",
       "panel.aim":"Cơ chế ngắm", "panel.turnMul":"Hệ số tốc độ xoay",
       "panel.turnNote":"Quay 180°: Minigun {a} s · SMG {b} s",
       "panel.arc":"Góc quét trước mặt",
@@ -764,6 +766,7 @@
       "btn.elite":"Summon Elite", "btn.mini":"Summon Mini-boss", "btn.lvl3":"Gain 3 levels",
       "btn.heal":"Full heal", "btn.crate":"Advanced crate", "btn.uniq":"Unique upgrade",
       "btn.cratefar":"Drop a crate 300px away", "btn.mainboss":"Summon the Tyrant",
+      "btn.gold":"+10,000 gold to wallet",
       "panel.aim":"Aiming", "panel.turnMul":"Turn rate multiplier",
       "panel.turnNote":"180° turn: Minigun {a} s · SMG {b} s",
       "panel.arc":"Front scan arc",
@@ -4119,6 +4122,13 @@
     queuePick("level"); queuePick("level"); queuePick("level");
   });
   $("d-heal").addEventListener("click", function(){ if (G) G.player.hp = G.player.maxhp; });
+  // Nạp thẳng vào VÍ, không vào G.gold: vàng nhặt trong ván chỉ là điểm số cho tới lúc
+  // settle() chạy cuối màn, nên cộng vào đó thì mở cửa hàng ra vẫn không mua được gì.
+  $("d-gold").addEventListener("click", function(){
+    wallet.grant("gold", 10000, "nút_thử");
+    renderLobby();
+    blip(880, 0.06, "square", 0.035);
+  });
   $("d-mainboss").addEventListener("click", function(){
     if (!G || G.bossSpawned || G.state === "dead" || G.state === "win") return;
     spawnBoss();

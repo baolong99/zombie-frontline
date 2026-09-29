@@ -216,6 +216,20 @@ ok(s.player.maxhp === 100, "đổi lại SMG thì máu tối đa về 100");
 ok(Math.abs(s.player.hp / s.player.maxhp - hurtFrac) < 0.02,
    "đổi súng giữ nguyên TỈ LỆ máu, không phải mẹo hồi máu");
 
+// --- nút thử +10.000 vàng phải vào VÍ, không phải vào điểm số của ván
+await page.evaluate(() => localStorage.setItem("zf_profile", JSON.stringify(
+  { v:2, gold:0, gem:0, cleared:{}, best:{}, runs:0, guns:{}, acc:{}, equip:[], gun:"smg" })));
+await page.reload();
+await page.waitForTimeout(400);
+ok(await page.$eval("#w-gold", e => +e.textContent) === 0, "bắt đầu với ví rỗng");
+await page.$eval("#d-gold", e => e.click());
+await page.$eval("#d-gold", e => e.click());
+ok(await page.$eval("#w-gold", e => +e.textContent) === 20000,
+   "bấm hai lần được 20.000 và hiện ngay trên sảnh");
+await page.reload();
+await page.waitForTimeout(400);
+ok(await page.$eval("#w-gold", e => +e.textContent) === 20000, "vàng nút thử sống qua tải lại");
+
 ok(errors.length === 0, "không có lỗi trang: " + (errors[0] || ""));
 await browser.close();
 console.log(fails ? "meta: " + fails + " lỗi" : "meta: tất cả đạt");
