@@ -55,7 +55,9 @@ await page.$eval("#btn-start", e => e.click());
 await page.waitForTimeout(600);
 let s = await st();
 ok(s.meta.area === "road", "vào ván ở khu vực road (thấy " + s.meta.area + ")");
-ok(s.meta.hp > 1.4 && s.meta.hp < 1.5, "hệ số máu khu vực 2 = " + s.meta.hp);
+// Không chốt cứng con số: thang khu vực là thứ sẽ còn cân đi cân lại. Cái phải đúng là
+// khu vực 2 khó hơn khu vực 1 và hệ số thật sự tới được vòng tính máu quái.
+ok(s.meta.hp > 1 && s.meta.hp < 2.5, "hệ số máu khu vực 2 nằm trong khoảng hợp lý: " + s.meta.hp);
 ok(s.meta.gold === 1200 && s.meta.gem === 35, "ví giữ nguyên trong ván");
 
 // --- hồ sơ hỏng không được làm chết trang
@@ -165,6 +167,31 @@ for (let i = 0; i < 6; i++){ await page.keyboard.press("KeyQ"); await page.waitF
                              ids.add((await st()).weapon.id); }
 ok([...ids].every(x => x === "smg" || x === "rifle"),
    "Q chỉ xoay trong khẩu đã mua (thấy " + [...ids].join(",") + ")");
+
+// --- tính cách từng khẩu: buff kèm debuff, và đổi súng không được thành mẹo hồi máu
+await page.evaluate(() => localStorage.setItem("zf_profile", JSON.stringify(
+  { v:2, gold:0, gem:0, cleared:{}, best:{}, runs:0, gun:"smg", equip:[], acc:{},
+    guns:{ smg:{own:true,star:0}, shotgun:{own:true,star:0}, sniper:{own:true,star:0} } })));
+await page.reload();
+await page.waitForTimeout(400);
+await page.$eval("#btn-start", e => e.click());
+await page.waitForTimeout(400);
+s = await st();
+const smgHp = s.player.maxhp, smgRate = s.weapon.mag;
+ok(smgHp === 100, "SMG: máu tối đa gốc 100 (thấy " + smgHp + ")");
+
+await page.keyboard.press("Digit3");              // Shotgun: máu +25%
+await page.waitForTimeout(120);
+s = await st();
+ok(s.player.maxhp === 125, "Shotgun: máu tối đa lên 125 (thấy " + s.player.maxhp + ")");
+const hurtFrac = s.player.hp / s.player.maxhp;
+
+await page.keyboard.press("Digit1");              // về SMG
+await page.waitForTimeout(120);
+s = await st();
+ok(s.player.maxhp === 100, "đổi lại SMG thì máu tối đa về 100");
+ok(Math.abs(s.player.hp / s.player.maxhp - hurtFrac) < 0.02,
+   "đổi súng giữ nguyên TỈ LỆ máu, không phải mẹo hồi máu");
 
 ok(errors.length === 0, "không có lỗi trang: " + (errors[0] || ""));
 await browser.close();

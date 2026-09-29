@@ -12,7 +12,12 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const PAGE = "file:///" + ROOT.split(String.fromCharCode(92)).join("/") + "/index.html";
-const ONLY = process.argv[2] ? +process.argv[2] : 0;
+// node ladder.mjs guns   -> giữ nguyên Nông trại, đổi KHẨU SÚNG. Dùng để kiểm xem bảng
+// tính cách của từng khẩu có làm khẩu nào áp đảo không.
+const ARG = process.argv[2] || "";
+const GUN_MODE = ARG === "guns";
+const ONLY = GUN_MODE ? 0 : (+ARG || 0);
+const ALL_GUNS = ["smg", "rifle", "shotgun", "minigun", "sniper"];
 const RUNS = +(process.env.LADDER_RUNS || 2);
 const AREAS = ["farm", "road", "city", "camp", "nest"];
 
@@ -39,8 +44,24 @@ const KITS = {
 const browser = await chromium.launch({ headless: true });
 const DIRS = ["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"];
 
-async function one(areaIdx, kitKey){
+// SO SÁNH THEO CẶP. Nguồn nhiễu lớn nhất không phải khu vực mà là con bot chọn nâng cấp
+// ngẫu nhiên: cùng một cấu hình nông trại chạy hai đợt ra 87 rồi 65 giây, tức ±25%. Ở mức
+// nhiễu đó thì chênh lệch giữa hai khu vực đọc không nổi.
+//
+// Cách chữa là bỏ Math.random đi: lượt thứ n của MỌI ô dùng đúng một chuỗi số giả ngẫu
+// nhiên, nên nó đi cùng một hướng và bấm cùng thứ tự thẻ. Khác biệt còn lại giữa các ô
+// mới thật sự là khác biệt của khu vực và trang bị.
+//
+// Lưu ý: bản thân game vẫn dùng Math.random cho chỗ sinh quái và tỉ lệ rơi đồ, nên đây là
+// bớt nhiễu chứ không phải hết nhiễu. Muốn hết thì phải nhét hạt giống vào trong game.
+function lcg(seed){
+  let x = seed >>> 0;
+  return () => { x = (x * 1664525 + 1013904223) >>> 0; return x / 4294967296; };
+}
+
+async function one(areaIdx, kitKey, seed){
   const kit = KITS[kitKey];
+  const rand = lcg(seed);
   const page = await browser.newPage({ viewport: { width: 1200, height: 780 } });
   const errors = [];
   page.on("pageerror", e => errors.push(String(e)));
@@ -61,10 +82,10 @@ async function one(areaIdx, kitKey){
   async function clearPicks(){
     for (let i = 0; i < 10; i++){
       if (!await page.$eval("#ov-pick", el => el.classList.contains("on"))) return;
-      await page.$$eval("#pick-list button", els => {
-        const c = els[Math.floor(Math.random() * els.length)];
+      await page.$$eval("#pick-list button", (els, r) => {
+        const c = els[Math.floor(r * els.length)];
         if (c) c.click();
-      });
+      }, rand());
       await page.waitForTimeout(110);
     }
   }
@@ -73,7 +94,7 @@ async function one(areaIdx, kitKey){
   for (let step = 0; step < 110; step++){
     if (step % 4 === 0){
       if (held) await page.keyboard.up(held);
-      held = DIRS[Math.floor(Math.random() * 4)];
+      held = DIRS[Math.floor(rand() * 4)];
       await page.keyboard.down(held);
     }
     await page.waitForTimeout(500);
@@ -88,12 +109,27 @@ async function one(areaIdx, kitKey){
   return out;
 }
 
+// Ở chế độ so súng, mỗi "mốc trang bị" là một khẩu: cùng sao, cùng phụ kiện, cùng khu
+// vực, chỉ khác khẩu. Đó là cách duy nhất đọc được bảng TRAIT có cân hay không.
+if (GUN_MODE){
+  for (const k of Object.keys(KITS)) delete KITS[k];
+  ALL_GUNS.forEach(function(id){
+    const guns = {};
+    ALL_GUNS.forEach(function(g){ guns[g] = { own:true, star:3 }; });
+    KITS[id] = { label:id, gun:id, guns:guns,
+                 acc:{ scope:{own:true,star:2}, pouch:{own:true,star:2} },
+                 equip:["scope", "pouch"] };
+  });
+}
+
 const table = [];
 for (let a = 0; a < AREAS.length; a++){
+  if (GUN_MODE && a !== 0) continue;
   if (ONLY && a !== ONLY - 1) continue;
   for (const k of Object.keys(KITS)){
     const rs = [];
-    for (let r = 0; r < RUNS; r++) rs.push(await one(a, k));
+    // hạt giống chỉ phụ thuộc số thứ tự lượt, KHÔNG phụ thuộc khu vực hay trang bị
+    for (let r = 0; r < RUNS; r++) rs.push(await one(a, k, 1000 + r * 7919));
     const dead = rs.filter(x => x.mode === "dead");
     const won = rs.filter(x => x.mode === "win").length;
     const avgT = Math.round(rs.reduce((x, y) => x + y.t, 0) / rs.length);

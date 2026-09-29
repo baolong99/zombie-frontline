@@ -213,9 +213,12 @@
   .s-btn:disabled{opacity:.35; cursor:not-allowed}
   .s-btn.buy{color:#ffcf49; border-color:rgba(255,207,73,.4)}
   .s-btn.gem{color:#6fd6ff; border-color:rgba(111,214,255,.4)}
+  .s-trait{font:600 10px/1.35 var(--f-mono); color:var(--toxic); opacity:.8; margin-top:3px}
   .s-empty{font:500 11px/1.5 var(--f-mono); color:var(--ink2); text-align:center; padding:14px 0}
   /* Thông báo vòng vây phải nằm trên mọi lớp HUD: cột chip nâng cấp bên trái dài dần theo
      trận và tới cuối màn nó cắt ngang đúng chỗ này. Vẽ trên canvas thì luôn bị chip đè. */
+  .wpntrait{font:600 9px/1.35 var(--f-mono); color:var(--toxic); opacity:.85; margin:-2px 0 6px;
+    letter-spacing:.02em}
   .arenamsg{position:absolute; left:0; right:0; top:26%; z-index:40; pointer-events:none;
     display:flex; flex-direction:column; align-items:center; gap:2px; text-align:center}
   .am-title{font:700 clamp(20px,3.4vh,34px)/1.1 var(--f-display); letter-spacing:.04em; color:#ff6054;
@@ -315,6 +318,7 @@
 
         <div class="wpnbox" id="wpnbox">
           <div class="wpnname" id="w-name">SMG</div>
+          <div class="wpntrait" id="w-trait"></div>
           <div class="wpnstats">
             <span data-i18n="wpn.turn">Tốc xoay</span><span id="w-turn">600°/s</span>
             <span data-i18n="wpn.half">Quay 180°</span><span id="w-half">0,30 s</span>
@@ -631,6 +635,11 @@
       "shop.max":"Tối đa", "shop.locked":"chưa sở hữu",
       "shop.equip":"Đeo", "shop.unequip":"Tháo", "shop.slots":"Ô trang bị {n}/{m}",
       "shop.use":"Chọn", "shop.using":"Đang dùng",
+      "trait.smg":"Tốc bắn +15%",
+      "trait.rifle":"Thay đạn nhanh hơn 35%",
+      "trait.shotgun":"Máu tối đa +25%",
+      "trait.minigun":"Thay đạn chậm hơn 40% · chạy chậm 12%",
+      "trait.sniper":"Đứng yên là ăn thưởng ngay · chạy chậm 18%",
       "meta.turn":"tốc xoay nòng", "meta.range":"tầm bắn", "meta.bspeed":"tốc độ đạn",
       "meta.mag":"băng đạn", "meta.pickup":"bán kính nhặt", "meta.gold":"vàng rơi",
       "meta.xp":"kinh nghiệm", "meta.none":"chưa có hệ số nào",
@@ -776,6 +785,11 @@
       "shop.max":"Maxed", "shop.locked":"not owned",
       "shop.equip":"Equip", "shop.unequip":"Remove", "shop.slots":"Gear slots {n}/{m}",
       "shop.use":"Select", "shop.using":"In use",
+      "trait.smg":"Fire rate +15%",
+      "trait.rifle":"Reloads 35% faster",
+      "trait.shotgun":"Max HP +25%",
+      "trait.minigun":"Reloads 40% slower · 12% slower on foot",
+      "trait.sniper":"Steady bonus with no wind-up · 18% slower on foot",
       "meta.turn":"turn rate", "meta.range":"range", "meta.bspeed":"bullet speed",
       "meta.mag":"magazine", "meta.pickup":"pickup radius", "meta.gold":"gold drops",
       "meta.xp":"xp gain", "meta.none":"no modifiers yet",
@@ -894,12 +908,27 @@
   // Hệ số máu tăng ~1,5 lần mỗi bậc. Hiện chưa có hệ vũ khí nên từ khu vực 2 trở đi sẽ rất
   // khó — đó là chủ ý: khoảng trống đó chính là chỗ sao súng và phụ kiện sẽ lấp vào.
   // Lần đầu dọn sạch một khu vực được thưởng kim cương, đây là nguồn kim cương không mất tiền.
+  // Thang khu vực, đặt theo SỐ ĐO của tests/ladder.mjs chứ không phải cảm tính.
+  //
+  // Bảng cũ là 1,00 / 1,45 / 2,10 / 3,10 / 4,50 và nó KHÔNG đi được. Đo ra: máu ×1,45 cắt
+  // thời gian sống của bot từ 87 giây xuống 55, mà trang bị tối đa chỉ kéo lại tới 61. Lý
+  // do nằm ngay trong quy tắc tách đôi — bảy chỉ số meta không có cái nào là sát thương,
+  // nên cửa hàng chỉ mua được THỜI GIAN BẮN HỮU ÍCH. Đo trên số quái diệt được: trang bị
+  // tối đa nhân đôi số diệt (109 -> 237 ở nông trại, 22 -> 57 ở thành phố), tức trần thật
+  // của cả cửa hàng là khoảng ×2. Thang máu ×4,5 thì vĩnh viễn không với tới.
+  //
+  // Nên máu cả thang chỉ đi từ ×1,00 tới ×1,95, mỗi nấc khoảng +18% để một bậc trang bị
+  // bắc qua đúng một khu vực. Phần khó còn lại chuyển sang THÀNH PHẦN đám đông, thứ mà
+  // cửa hàng không mua được bằng tiền:
+  //   fast  tỉ lệ zombie chạy cộng thêm — ép người chơi giữ khoảng cách chứ không đứng cày
+  //   rate  hệ số mật độ và nhịp sinh — đám đông dày hơn, ít chỗ lùi hơn
+  // Nhờ vậy khu vực 5 vẫn ra chất tận thế mà không phải là bức tường số học.
   var AREAS = [
-    { k:"farm", theme:"farm", hp:1.00, gold:1.00, firstGem:0 },
-    { k:"road", theme:"war",  hp:1.45, gold:1.30, firstGem:20 },
-    { k:"city", theme:"city", hp:2.10, gold:1.70, firstGem:30 },
-    { k:"camp", theme:"war",  hp:3.10, gold:2.20, firstGem:45 },
-    { k:"nest", theme:"city", hp:4.50, gold:2.90, firstGem:70 }
+    { k:"farm", theme:"farm", hp:1.00, gold:1.00, fast:0.00, rate:1.00, firstGem:15 },
+    { k:"road", theme:"war",  hp:1.18, gold:1.15, fast:0.06, rate:1.10, firstGem:20 },
+    { k:"city", theme:"city", hp:1.40, gold:1.32, fast:0.12, rate:1.22, firstGem:30 },
+    { k:"camp", theme:"war",  hp:1.65, gold:1.50, fast:0.18, rate:1.36, firstGem:45 },
+    { k:"nest", theme:"city", hp:1.95, gold:1.70, fast:0.26, rate:1.52, firstGem:70 }
   ];
   var curArea = 0;
   function area(){ return AREAS[curArea] || AREAS[0]; }
@@ -924,6 +953,23 @@
     { id:"sniper", name:"Sniper", color:"#cfe8ff", turn:240, rate:1.05, dmg:95, pellets:1, spread:0.6,
       bspeed:1500, range:1000, pierce:2, mag:5, reload:2.2, kb:70, shake:3.6, spin:0, trail:26, steady:1.8 }
   ];
+  // ---- TÍNH CÁCH TỪNG KHẨU: buff kèm debuff, không phải nấc sức mạnh.
+  //
+  // Đây là thuộc tính GỐC của khẩu súng, không phải hàng cửa hàng — nên nó không phạm quy
+  // tắc tách đôi. Cây nâng cấp vẫn nhân lên trên, cửa hàng vẫn chỉ đụng bảy chỉ số meta.
+  //
+  // Mục đích là để chọn khẩu là chọn LỐI CHƠI chứ không phải chọn khẩu mạnh nhất. Vì thế
+  // mỗi cái được đều phải trả giá: nhanh thì mỏng, dai thì chậm, mạnh thì đứng yên.
+  var TRAIT = {
+    smg:     { rateMul:0.85 },                        // bắn nhanh hơn 15%
+    rifle:   { reloadMul:0.65 },                      // thay đạn nhanh hơn 35%
+    shotgun: { hpMul:1.25 },                          // máu tối đa +25%
+    minigun: { reloadMul:1.40, speedMul:0.88 },       // súng nặng: nạp lâu, chạy chậm
+    sniper:  { steadyNow:true, speedMul:0.82 }        // đứng yên là ăn thưởng ngay, đổi lấy tốc chạy
+  };
+  function trait(id){ return TRAIT[id] || {}; }
+  function traitOf(){ return G ? trait(WEAPONS[G.player.wi].id) : {}; }
+
   var STEADY_AFTER = 0.5;
   WEAPONS.forEach(function(w){ w.dps = Math.round(w.dmg * w.pellets / w.rate); });
 
@@ -1219,12 +1265,13 @@
       player:{ x:0, y:0, r:14, a:-Math.PI/2, hp:100, maxhp:100,
                iframe:0, wi:firstOwned(), spin:0, muzzle:0, stillT:0, shieldUp:false, shieldT:0, regenT:25,
                moveA:null, anim:"idle", ft:0,
-               hot:0, slugN:0, undyT:0 },
+               hot:0, slugN:0, undyT:0, gunHp:1 },
       guns: WEAPONS.map(function(w){ return { ammo:w.mag, reloadT:0, cool:0 }; }),
       zombies:[], corpses:[], bullets:[], waves:[], parts:[], nums:[], orbs:[], items:[], crates:[], rings:[], markers:[],
       spawnT:0
     };
     G.meta = metaFor(WEAPONS[G.player.wi].id);
+    applyGunHp(1, trait(WEAPONS[G.player.wi].id).hpMul || 1);
     renderUpStack();
     updateHUD();
   }
@@ -1238,6 +1285,17 @@
   }
   // Khẩu xuất phát là khẩu người chơi chọn ở sảnh. Mua Sniper mà vào ván vẫn cầm SMG thì
   // cả cửa hàng vô nghĩa — đây chính là chỗ dễ quên nhất của cả hệ.
+  // Đổi súng giữa trận mà khẩu mới có hpMul khác thì máu tối đa co giãn theo, và máu hiện
+  // tại co giãn CÙNG TỈ LỆ. Nếu chỉ đổi maxhp thì cầm Shotgun rồi đổi qua đổi lại là một
+  // cách hồi máu miễn phí; nếu chỉ đổi maxhp xuống thì đổi súng lại thành tự sát.
+  function applyGunHp(oldMul, newMul){
+    if (!G || oldMul === newMul) return;
+    var p = G.player, f = newMul / oldMul;
+    p.maxhp = Math.round(p.maxhp * f);
+    p.hp = Math.max(1, Math.min(p.maxhp, Math.round(p.hp * f)));
+    p.gunHp = newMul;
+  }
+
   function firstOwned(){
     for (var i = 0; i < WEAPONS.length; i++)
       if (WEAPONS[i].id === P.gun && gunEntry(P.gun).own) return i;
@@ -1250,7 +1308,8 @@
   function wstat(i){
     var w = WEAPONS[i], U = uni() || {};
     var M = metaFor(w.id);            // sao súng + phụ kiện, không đụng vào sát thương/tốc bắn
-    var rate = w.rate / (has("rate") ? 1.70 : 1);
+    var tr = trait(w.id);
+    var rate = w.rate * (tr.rateMul || 1) / (has("rate") ? 1.70 : 1);
     if (has("hotload") && G.player.hot > 0) rate /= 2;   // vừa thay đạn xong: nhịp bắn gấp đôi
     if (U.fireMul) rate /= U.fireMul;
     var dmg = w.dmg * (has("dmg") ? 1.60 : 1) * (has("size") ? 1.40 : 1);
@@ -1258,7 +1317,7 @@
     var rad = 3 + (has("size") ? 7 : 0);
     if (U.radMul) rad *= U.radMul;
     if (U.radAdd) rad += U.radAdd;
-    var reload = w.reload * (has("mag") ? 0.5 : 1);
+    var reload = w.reload * (tr.reloadMul || 1) * (has("mag") ? 0.5 : 1);
     if (U.reloadMul) reload *= U.reloadMul;
     // Xuyên Phá lên nòng cố định và cực nhanh: bắn xong một viên là gần như bắn tiếp được ngay,
     // nên nhịp bắn của khẩu súng mới là thứ giới hạn, không phải thời gian thay đạn.
@@ -1289,7 +1348,7 @@
     }
 
     return { base:w, turn:w.turn * T.turnMul * M.turn, arc:T.frontArc,
-             bspeed:w.bspeed * M.bspeed, meta:M,
+             bspeed:w.bspeed * M.bspeed, meta:M, trait:tr,
              rate:rate, dmg:dmg, rad:rad, lines:lines, pellets:pellets,
              rear:has("rear") ? 2 : 0, pierce:pierce, bounce:bounce, rebound:rebound,
              steady:w.steady || 0, mag:mag, range:range, reload:reload };
@@ -1377,6 +1436,7 @@
   function setWeapon(i){
     if (!G || i === G.player.wi || i < 0 || i >= WEAPONS.length) return;
     if (!gunEntry(WEAPONS[i].id).own) return;
+    applyGunHp(G.player.gunHp || 1, trait(WEAPONS[i].id).hpMul || 1);
     G.player.wi = i; G.player.spin = 0;
     G.meta = metaFor(WEAPONS[i].id);   // sao của từng khẩu khác nhau, đổi súng là đổi hệ số
     syncWeaponUI();
@@ -1629,7 +1689,8 @@
     var p = G.player, ws = wstat(p.wi), w = ws.base, g = G.guns[p.wi];
     var ox = p.x + Math.cos(p.a) * (p.r + 3), oy = p.y + Math.sin(p.a) * (p.r + 3);
     var n = ws.pellets, lines = ws.lines, fan = 9 * Math.PI / 180;
-    var steady = (ws.steady && p.stillT >= STEADY_AFTER) ? ws.steady : 1;
+    var after = ws.trait.steadyNow ? 0 : STEADY_AFTER;
+    var steady = (ws.steady && p.stillT >= after) ? ws.steady : 1;
     for (var L = 0; L < lines; L++){
       var lineA = p.a + (L - (lines - 1) / 2) * fan;
       for (var i = 0; i < n; i++){
@@ -2267,7 +2328,7 @@
     if (pendingSwap){ setWeapon(nextOwned()); pendingSwap = false; }
 
     // ---- movement
-    var spd = T.pspeed * (has("vigor") ? 1.25 : 1);
+    var spd = T.pspeed * (has("vigor") ? 1.25 : 1) * (traitOf().speedMul || 1);
     var mx = 0, my = 0;
     if (inp.m > 0){
       mx = inp.x * spd * inp.m; my = inp.y * spd * inp.m;
@@ -2309,17 +2370,18 @@
 
     // ---- schedule: trickle spawns + elites on the clock
     var alive = G.zombies.length;
-    var cap = Math.round((52 + (G.t / LEVEL_TIME) * 58) * T.density);
+    var cap = Math.round((52 + (G.t / LEVEL_TIME) * 58) * T.density * area().rate);
     G.spawnT -= dt;
     if (G.spawnT <= 0){
-      G.spawnT = Math.max(0.24, 1.15 - (G.t / LEVEL_TIME) * 0.85) / Math.max(0.4, T.density);
+      G.spawnT = Math.max(0.24, 1.15 - (G.t / LEVEL_TIME) * 0.85)
+                 / Math.max(0.4, T.density * area().rate);
       // Ngừng nhỏ giọt khi đang trong vòng vây (trận tay đôi) và sau khi elite phút 10 ngã
       if (alive < cap && !G.arena && !G.spawnDone){
         // Vòng sinh nằm ngoài tầm nhìn nên quái đi bộ mất gần gấp đôi thời gian mới tới nơi
         // so với hồi sinh ở rìa sân cũ. Đẻ theo chỗ trống còn lại thay vì theo đồng hồ, để
         // "Mật độ zombie" lại đúng là thứ quyết định đám đông đông tới đâu.
         var batch = Math.max(1, Math.min(9, Math.ceil((cap - alive) * 0.09)));
-        var runnerRatio = 0.16 + (G.t / LEVEL_TIME) * 0.46;
+        var runnerRatio = Math.min(0.92, 0.16 + (G.t / LEVEL_TIME) * 0.46 + area().fast);
         var pos = spawnPos();
         for (var s = 0; s < batch; s++)
           spawnZombie(pos.x + rnd(-24, 24), pos.y + rnd(-24, 24),
@@ -3678,6 +3740,7 @@
     if (!G) return;
     var i = G.player.wi, ws = wstat(i), w = WEAPONS[i], g = G.guns[i];
     $("w-name").textContent = w.name;
+    $("w-trait").textContent = t("trait." + w.id);
     $("btn-swap-n").textContent = String(nextOwned() + 1);
     $("btn-swap").hidden = ownedGuns().length < 2;   // chỉ có một khẩu thì nút đổi súng vô nghĩa
     $("w-turn").textContent = Math.round(ws.turn) + "°/s";
@@ -3685,7 +3748,7 @@
     // DPS thực tế phải cộng cả thời gian thay đạn, nếu không băng 1 viên sẽ hiện con số vô nghĩa
     var effRate = ws.rate + ws.reload / Math.max(1, ws.mag);
     $("w-dps").textContent = Math.round(ws.dmg * ws.pellets * ws.lines / effRate);
-    var ready = ws.steady && G.player.stillT >= STEADY_AFTER;
+    var ready = ws.steady && G.player.stillT >= (ws.trait.steadyNow ? 0 : STEADY_AFTER);
     $("w-steadyl").hidden = !ws.steady;
     $("w-steady").hidden = !ws.steady;
     if (ws.steady){
@@ -3809,6 +3872,12 @@
     note.className = "s-note";
     note.textContent = opt.note;
     left.appendChild(name); left.appendChild(note);
+    if (opt.sub){
+      var sub = document.createElement("div");
+      sub.className = "s-trait";
+      sub.textContent = opt.sub;
+      left.appendChild(sub);
+    }
     var acts = document.createElement("div");
     acts.className = "s-acts";
     (opt.acts || []).forEach(function(a){
@@ -3853,7 +3922,8 @@
       }
       srow(host, { name:w.name, star:e.star,
                    cls:(e.own ? "" : "locked") + (P.gun === w.id ? " equipped" : ""),
-                   note:e.own ? gunNote(w, m) : t("shop.locked"), acts:acts });
+                   note:e.own ? gunNote(w, m) : t("shop.locked"),
+                   sub:t("trait." + w.id), acts:acts });
     });
   }
   // Chỉ liệt kê những chỉ số khẩu này THỰC SỰ được sao đẩy, cộng thêm thứ phụ kiện đang
