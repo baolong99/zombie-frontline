@@ -96,18 +96,73 @@ Vài quyết định đáng nhớ, đã ghi chú trong code tại đúng chỗ:
 - **Trần vật phẩm có thu hồi** — chạm trần thì gộp viên xa nhất vào chỗ vừa rơi, không vứt đi,
   nên người chơi không mất kinh nghiệm.
 
-### Quy cách art (đã chốt, chưa có file)
+## Quy cách render sprite
 
-| Loại | Kích thước nguồn |
+Đường ống nhắm tới **art 3D dựng sẵn rồi render ra sprite sheet** — loại art của các game
+zombie top-down thương mại. Đưa bảng này cho hoạ sĩ, hoặc dùng chính nó khi tự dựng cảnh
+render trong Blender. Sai một dòng là art không khớp.
+
+### Camera
+
+| | |
 |---|---|
-| Nhân vật | 128×128 |
-| Zombie thường | 96×96 |
-| Elite | 192×192 |
-| Trùm | 256×256 |
-| Ô lát nền | 256×256, **liền mạch bốn cạnh** |
+| Kiểu | Trực giao (orthographic), **không** phối cảnh |
+| Góc nghiêng | **60° so với phương thẳng đứng** — khớp với `LEAN = 0.5` trong code |
+| Xoay quanh trục đứng | 0°, mô hình xoay chứ camera đứng yên |
+| Nền | Trong suốt, **không render bóng đổ xuống đất** (game tự vẽ bóng) |
+| Ánh sáng | Một nguồn chính từ trên chếch, cố định trong hệ toạ độ CAMERA để mọi hướng sáng như nhau |
 
-Đặt tên `spr_<đối tượng>_<biến thể>_<trạng thái>_<số>.png`. Nạp vào `ART.img` là đường
-sprite tự bật, logic game không phải sửa.
+### Bố cục sprite sheet
+
+Mỗi hoạt cảnh là **một file PNG** dạng lưới ô vuông:
+
+```
+hàng = hướng quay (8 hàng)      cột = khung hoạt cảnh
+hàng 0 = quay mặt XUỐNG DƯỚI (về phía camera), các hàng sau theo CHIỀU KIM ĐỒNG HỒ
+  hàng 0 = Nam    hàng 1 = Tây Nam   hàng 2 = Tây    hàng 3 = Tây Bắc
+  hàng 4 = Bắc    hàng 5 = Đông Bắc  hàng 6 = Đông   hàng 7 = Đông Nam
+```
+
+Code **suy số cột từ kích thước ảnh** (`rộng ÷ (cao ÷ số hướng)`), nên không phải khai báo —
+nhưng **ô bắt buộc vuông**, lệch là mọi thứ lệch theo.
+
+| Loại | Ô | Hoạt cảnh (số khung gợi ý) |
+|---|---|---|
+| Nhân vật | 128×128 | idle 4 · walk 8 · die 10 |
+| Zombie thường | 96×96 | walk 8 · die 10 |
+| Elite | 192×192 | walk 8 · die 12 |
+| Trùm | 256×256 | walk 8 · attack 8 · die 14 |
+| Ô lát nền | 256×256 | tĩnh, **liền mạch bốn cạnh** |
+
+Nhịp phát nằm ở `ANIM_FPS`: idle 6 · walk 12 · die 14 · attack 14.
+
+### Điểm neo
+
+**Điểm chạm đất phải nằm cùng một chỗ ở mọi khung và mọi hướng.** Đây là lỗi hay gặp nhất:
+lệch vài pixel là nhân vật trôi khỏi bóng của nó khi quay người.
+
+Khai báo bằng `foot` — vị trí điểm chạm đất tính từ đỉnh ô, theo tỉ lệ. `foot: 0.90` nghĩa
+là chân cách đáy ô 10%. Chừa khoảng trống dưới chân để hoạt cảnh chết (nằm ngã) không bị cắt.
+
+### Khai báo trong code
+
+```js
+SKIN.walker = {
+  dirs: 8,            // số hàng
+  hMul: 3.2,          // chiều cao vẽ = bán kính va chạm × hMul (walker r=13 → 42 đơn vị)
+  foot: 0.90,
+  dir0: Math.PI / 2,  // góc của hàng 0; mặc định đã là +90° (quay xuống dưới)
+  anims: { walk:"z_walk", die:"z_die" }
+};
+loadArt({ z_walk:"assets/zombie_walk.png", z_die:"assets/zombie_die.png" });
+```
+
+Chỉ vậy. Có ảnh là `drawSprite()` tự bật, hình vẽ bằng code tự tắt, **logic game không đụng
+một dòng**. Việc chọn hàng có vùng đệm 60% một cung để nhân vật không giật qua lại khi góc
+ngắm nằm đúng ranh giới hai hướng.
+
+Bộ nào chỉ có 5 hướng (Nam → Bắc) và trông đợi tự lật gương cho nửa còn lại thì phải dựng
+đủ 8 hàng trước khi nạp — code hiện chưa hỗ trợ lật gương.
 
 ## Kiểm thử
 

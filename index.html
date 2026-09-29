@@ -1453,10 +1453,11 @@
     if (G.target === z) G.target = null;
     // Bộ da nào có hoạt cảnh chết thì để lại cái xác chạy cho hết; hôm nay chưa bộ nào có
     // nên nhánh này không chạy và zombie vẫn tan thành hạt như cũ.
-    if (sprite(SKIN[z.kind || z.type]) && ANIM.die && G.corpses.length < 60){
-      var dur = ANIM.die.n / ANIM.die.fps;
+    var dieN = animFrames(z.kind || z.type, "die");
+    if (dieN && G.corpses.length < 60){
+      var dur = dieN / ANIM_FPS.die;
       G.corpses.push({ x:z.x, y:z.y, r:z.r, face:z.face, kind:z.kind || z.type,
-                       corpse:true, anim:"die", ft:0, life:dur, max:dur });
+                       corpse:true, anim:"die", ft:0, life:dur, max:dur, sprRow:z.sprRow });
     }
     var big = !!z.elite || z.kind === "mini";
     spark(z.x, z.y, big ? 26 : 13, "rgba(150,40,40,.9)", big ? 260 : 190, 0.55);
@@ -2392,23 +2393,67 @@
     });
   }
   // tên sprite theo loại thực thể — để trống nghĩa là "vẽ tay"
-  var SKIN = { player:"", walker:"", runner:"", armor:"", splitter:"", summoner:"",
-               charger:"", shield:"", mini:"" };
-  var ANIM = { walk:{ n:6, fps:9 }, idle:{ n:4, fps:5 }, die:{ n:10, fps:14 } };
+  // ---- ĐƯỜNG ỐNG SPRITE 8 HƯỚNG
+  //
+  // Dành cho art 3D dựng sẵn rồi render ra sprite sheet — đúng loại art của các game
+  // zombie top-down thương mại. Mỗi hoạt cảnh là MỘT ảnh, bố cục lưới:
+  //     hàng = hướng quay    cột = khung hoạt cảnh    ô vuông
+  //
+  // Số cột suy ra từ kích thước ảnh (rộng ÷ (cao ÷ số hướng)), nên không phải khai báo.
+  // Ô phải vuông, nếu không mọi thứ lệch.
+  //
+  // dir0 = góc của HÀNG 0. Mặc định +90° = nhân vật quay mặt xuống dưới, về phía camera —
+  // quy ước phổ biến nhất của các bộ bán sẵn. Các hàng sau quay theo chiều kim đồng hồ.
+  // foot = điểm chạm đất nằm ở đâu tính từ đỉnh ô (0,90 = cách đáy 10%). Sai số này là thứ
+  // làm nhân vật trôi lệch khỏi bóng của nó, nên nó là tham số riêng chứ không đoán.
+  var ANIM_FPS = { idle:6, walk:12, die:14, attack:14 };
+  var SKIN = {
+    // player: { dirs:8, hMul:3.4, foot:0.90, anims:{ idle:"p_idle", walk:"p_walk" } },
+  };
+
+  function skinImg(kind, anim){
+    var sk = SKIN[kind];
+    if (!sk || !sk.anims) return null;
+    var name = sk.anims[anim] || sk.anims.walk || sk.anims.idle;
+    return sprite(name);
+  }
+  // Số khung của một hoạt cảnh, suy từ ảnh. Dùng cả cho thời lượng hoạt cảnh chết.
+  function animFrames(kind, anim){
+    var im = skinImg(kind, anim), sk = SKIN[kind];
+    if (!im) return 0;
+    var cell = im.height / (sk.dirs || 1);
+    return Math.max(1, Math.round(im.width / cell));
+  }
+  // Chọn hàng theo góc, kèm vùng đệm: chỉ đổi hàng khi đã lệch quá 60% một cung. Không có
+  // nó thì lúc ngắm nằm đúng ranh giới hai hướng, nhân vật sẽ giật qua lại mỗi khung.
+  function dirRow(e, ang, sk){
+    var d = sk.dirs || 1;
+    if (d <= 1) return 0;
+    var base = sk.dir0 == null ? Math.PI / 2 : sk.dir0;
+    var sector = 6.283185307 / d;
+    var idx = ((Math.round((ang - base) / sector) % d) + d) % d;
+    if (e.sprRow != null && e.sprRow !== idx &&
+        Math.abs(angDiff(ang, e.sprRow * sector + base)) < sector * 0.6) idx = e.sprRow;
+    e.sprRow = idx;
+    return idx;
+  }
 
   // Vẽ một thực thể bằng sprite. Trả về false nếu chưa có ảnh, để nơi gọi vẽ tay thay thế.
   function drawSprite(e, kind, ang){
-    var im = sprite(SKIN[kind]);
+    var sk = SKIN[kind];
+    if (!sk) return false;
+    var anim = e.anim || "walk";
+    var im = skinImg(kind, anim);
     if (!im) return false;
-    var a = ANIM[e.anim || "walk"] || ANIM.walk;
-    var fr = Math.floor((e.ft || 0) * a.fps) % a.n;
-    var fw = im.height, sx = fr * fw;              // atlas một hàng ngang, ô vuông
-    var sc = (e.r * 2.6) / fw;
-    ctx.save();
-    ctx.translate(e.x, e.y);
-    if (Math.cos(ang) < 0) ctx.scale(-1, 1);       // chỉ lật, không xoay thân
-    ctx.drawImage(im, sx, 0, fw, fw, -fw * sc / 2, -fw * sc * 0.62, fw * sc, fw * sc);
-    ctx.restore();
+    var dirs = sk.dirs || 1;
+    var cell = im.height / dirs;
+    var frames = Math.max(1, Math.round(im.width / cell));
+    var fps = ANIM_FPS[anim] || ANIM_FPS.walk;
+    var fr = Math.floor((e.ft || 0) * fps);
+    fr = anim === "die" ? Math.min(fr, frames - 1) : fr % frames;   // chết thì dừng ở khung cuối
+    var h = e.r * (sk.hMul || 3), foot = sk.foot == null ? 0.9 : sk.foot;
+    ctx.drawImage(im, fr * cell, dirRow(e, ang, sk) * cell, cell, cell,
+                  e.x - h / 2, e.y - h * foot, h, h);
     return true;
   }
 
